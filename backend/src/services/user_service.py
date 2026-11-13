@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
 
-from src.dtos.user_dto import CreateUserDTO, UserResponseDTO
+from src.dtos.user_dto import CreateUserDTO, UpdateUserDTO, UserResponseDTO
 from src.mappers.user_mapper import to_user_response
 from src.repositories.user_repository import UserRepository
+from src.utils.errors import ConflictError, NotFoundError
 from src.utils.hash import hash_password
 
 
@@ -21,17 +22,26 @@ class UserService:
         return to_user_response(user)
 
     def get_by_id(self, user_id: int) -> UserResponseDTO:
-        # TODO: buscar el user. Si no existe, lanzar NotFoundError. Devolver UserResponseDTO.
-        ...
+        user = self.repo.find_by_id(user_id)
+        if user is None:
+            raise NotFoundError("Usuario no encontrado")
+        return to_user_response(user)
 
     def list_all(self) -> list[UserResponseDTO]:
-        # TODO: devolver lista de UserResponseDTO
-        ...
+        return [to_user_response(u) for u in self.repo.list_all()]
 
-    def update(self, user_id: int, dto) -> UserResponseDTO:
-        # TODO: validar existencia, aplicar cambios desde dto, devolver el DTO actualizado.
-        ...
+    def update(self, user_id: int, dto: UpdateUserDTO) -> UserResponseDTO:
+        if self.repo.find_by_id(user_id) is None:
+            raise NotFoundError("Usuario no encontrado")
+        fields = dto.model_dump(exclude_none=True)
+        if "email" in fields:
+            otro = self.repo.find_by_email(fields["email"])
+            if otro and otro.id != user_id:
+                raise ConflictError("Ya existe un usuario con ese email")
+        if "password" in fields:
+            fields["password_hash"] = hash_password(fields.pop("password"))
+        return to_user_response(self.repo.update(user_id, **fields))
 
     def delete(self, user_id: int) -> None:
-        # TODO: borrar el user. Si no existe, NotFoundError.
-        ...
+        if not self.repo.delete(user_id):
+            raise NotFoundError("Usuario no encontrado")
