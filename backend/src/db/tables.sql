@@ -1,104 +1,172 @@
--- 1. Catálogo de Tarifas (HU4)
-CREATE TABLE tarifas (
-    id SERIAL PRIMARY KEY,
-    categoria VARCHAR(20) NOT NULL UNIQUE CHECK (categoria IN ('economico', 'confort', 'premium')),
-    precio_base NUMERIC(10, 2) NOT NULL CHECK (precio_base > 0),
-    precio_por_km NUMERIC(10, 2) NOT NULL CHECK (precio_por_km > 0)
+-- =============================================================================
+-- PROYECTO 6 — IOL (InvertirOnline)
+-- Script de Creación de Base de Datos y Tablas para PostgreSQL / pgAdmin
+-- =============================================================================
+
+-- 1. CREACIÓN DE TIPOS ENUM PERSONALIZADOS
+--------------------------------------------------------------------------------
+CREATE TYPE perfil_riesgo_enum AS ENUM ('conservador', 'moderado', 'agresivo');
+CREATE TYPE tipo_activo_enum AS ENUM ('accion', 'cedear', 'bono');
+CREATE TYPE moneda_enum AS ENUM ('ARS', 'USD');
+CREATE TYPE tipo_operacion_enum AS ENUM ('compra', 'venta');
+CREATE TYPE estado_operacion_enum AS ENUM ('pendiente', 'completada', 'rechazada');
+CREATE TYPE tipo_movimiento_enum AS ENUM ('deposito', 'extraccion', 'dividendo', 'compra', 'venta');
+
+-- 2. TABLA INVERSOR (HU1, HU5)
+--------------------------------------------------------------------------------
+CREATE TABLE inversor (
+    id BIGSERIAL PRIMARY KEY,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    nombre VARCHAR(150) NOT NULL,
+    cuit VARCHAR(11) NOT NULL UNIQUE,
+    perfil_riesgo perfil_riesgo_enum NOT NULL DEFAULT 'conservador',
+    fecha_alta TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    -- CUIT debe ser exactamente de 11 dígitos numéricos
+    CONSTRAINT chk_cuit_formato CHECK (cuit ~ '^[0-9]{11}$')
 );
 
--- 2. Pasajeros (HU1)
-CREATE TABLE pasajeros (
-    id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    email VARCHAR(150) NOT NULL UNIQUE,
-    telefono VARCHAR(20) NOT NULL
+-- 3. TABLA CUENTA (HU1, HU3, HU10)
+--------------------------------------------------------------------------------
+CREATE TABLE cuenta (
+    id BIGSERIAL PRIMARY KEY,
+    inversor_id BIGINT NOT NULL UNIQUE,
+    numero_comitente VARCHAR(50) NOT NULL UNIQUE,
+    saldo_ars NUMERIC(18, 2) NOT NULL DEFAULT 0.00,
+    saldo_usd NUMERIC(18, 2) NOT NULL DEFAULT 0.00,
+
+    CONSTRAINT fk_cuenta_inversor FOREIGN KEY (inversor_id) 
+        REFERENCES inversor(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+        
+    -- Los saldos en cuenta no pueden ser negativos
+    CONSTRAINT chk_saldo_ars_no_negativo CHECK (saldo_ars >= 0),
+    CONSTRAINT chk_saldo_usd_no_negativo CHECK (saldo_usd >= 0)
 );
 
--- 3. Conductores (HU1)
-CREATE TABLE conductores (
-    id SERIAL PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    licencia VARCHAR(50) NOT NULL UNIQUE,
-    calificacion_promedio NUMERIC(3, 2) DEFAULT 0 CHECK (calificacion_promedio >= 0 AND calificacion_promedio <= 5),
-    disponible BOOLEAN DEFAULT TRUE
+-- 4. TABLA ACTIVO (HU2, HU5, HU8, HU9)
+--------------------------------------------------------------------------------
+CREATE TABLE activo (
+    id BIGSERIAL PRIMARY KEY,
+    ticker VARCHAR(20) NOT NULL UNIQUE,
+    nombre VARCHAR(150) NOT NULL,
+    tipo tipo_activo_enum NOT NULL,
+    moneda moneda_enum NOT NULL,
+    precio_actual NUMERIC(18, 4) NOT NULL,
+    nivel_riesgo SMALLINT NOT NULL,
+    activo BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT chk_precio_actual_positivo CHECK (precio_actual > 0),
+    CONSTRAINT chk_nivel_riesgo_rango CHECK (nivel_riesgo BETWEEN 1 AND 5)
 );
 
--- 4. Vehículos (HU2)
-CREATE TABLE vehiculos (
-    id SERIAL PRIMARY KEY,
-    conductor_id INTEGER NOT NULL REFERENCES conductores(id),
-    patente VARCHAR(20) NOT NULL UNIQUE,
-    modelo VARCHAR(50) NOT NULL,
-    anio INTEGER NOT NULL,
-    categoria VARCHAR(20) NOT NULL CHECK (categoria IN ('economico', 'confort', 'premium'))
+-- 5. TABLA TENENCIA (Relación N a M entre Cuenta y Activo) (HU4, HU6, HU10)
+--------------------------------------------------------------------------------
+CREATE TABLE tenencia (
+    cuenta_id BIGINT NOT NULL,
+    activo_id BIGINT NOT NULL,
+    cantidad NUMERIC(18, 6) NOT NULL DEFAULT 0,
+    precio_promedio NUMERIC(18, 4) NOT NULL DEFAULT 0,
+
+    PRIMARY KEY (cuenta_id, activo_id),
+    
+    CONSTRAINT fk_tenencia_cuenta FOREIGN KEY (cuenta_id) 
+        REFERENCES cuenta(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_tenencia_activo FOREIGN KEY (activo_id) 
+        REFERENCES activo(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+        
+    CONSTRAINT chk_tenencia_cantidad CHECK (cantidad >= 0),
+    CONSTRAINT chk_tenencia_precio_promedio CHECK (precio_promedio >= 0)
 );
 
--- 5. Métodos de Pago (HU3)
-CREATE TABLE metodos_pago (
-    id SERIAL PRIMARY KEY,
-    pasajero_id INTEGER NOT NULL REFERENCES pasajeros(id),
-    tipo VARCHAR(30) NOT NULL CHECK (tipo IN ('tarjeta_credito', 'tarjeta_debito', 'efectivo', 'billetera_virtual')),
-    ultimos_digitos CHAR(4) -- Solo para tarjetas, puede ser NULL en efectivo
+-- 6. TABLA FAVORITO (Relación N a M entre Inversor y Activo) (HU12)
+--------------------------------------------------------------------------------
+CREATE TABLE favorito (
+    inversor_id BIGINT NOT NULL,
+    activo_id BIGINT NOT NULL,
+    fecha_agregado TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    PRIMARY KEY (inversor_id, activo_id),
+    
+    CONSTRAINT fk_favorito_inversor FOREIGN KEY (inversor_id) 
+        REFERENCES inversor(id) ON DELETE CASCADE ON UPDATE CASCADE,
+    CONSTRAINT fk_favorito_activo FOREIGN KEY (activo_id) 
+        REFERENCES activo(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
--- 6. Cupones (HU13)
-CREATE TABLE cupones (
-    id SERIAL PRIMARY KEY,
-    codigo VARCHAR(20) NOT NULL UNIQUE,
-    porcentaje_descuento INTEGER NOT NULL CHECK (porcentaje_descuento BETWEEN 1 AND 100),
-    fecha_vencimiento DATE NOT NULL
+-- 7. TABLA OPERACION (HU4, HU6, HU7, HU11, HU12)
+--------------------------------------------------------------------------------
+CREATE TABLE operacion (
+    id BIGSERIAL PRIMARY KEY,
+    cuenta_id BIGINT NOT NULL,
+    activo_id BIGINT NOT NULL,
+    tipo tipo_operacion_enum NOT NULL,
+    cantidad NUMERIC(18, 6) NOT NULL,
+    precio_unitario NUMERIC(18, 4) NOT NULL,
+    comision NUMERIC(18, 2) NOT NULL,
+    total NUMERIC(18, 2) NOT NULL,
+    ganancia_realizada NUMERIC(18, 2) NULL, -- Guardado al vender (HU6)
+    fecha TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    estado estado_operacion_enum NOT NULL DEFAULT 'completada',
+
+    CONSTRAINT fk_operacion_cuenta FOREIGN KEY (cuenta_id) 
+        REFERENCES cuenta(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+    CONSTRAINT fk_operacion_activo FOREIGN KEY (activo_id) 
+        REFERENCES activo(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+        
+    CONSTRAINT chk_operacion_cantidad CHECK (cantidad > 0),
+    CONSTRAINT chk_operacion_precio CHECK (precio_unitario > 0),
+    CONSTRAINT chk_operacion_comision CHECK (comision >= 0),
+    CONSTRAINT chk_operacion_total CHECK (total > 0)
 );
 
--- 7. Multiplicador Horario (HU11)
-CREATE TABLE multiplicadores_horario (
-    id SERIAL PRIMARY KEY,
-    dia_semana INTEGER NOT NULL CHECK (dia_semana BETWEEN 0 AND 6), -- 0=Domingo, 6=Sábado
-    hora_desde TIME NOT NULL,
-    hora_hasta TIME NOT NULL,
-    factor NUMERIC(3, 2) NOT NULL CHECK (factor > 1),
-    CONSTRAINT check_horario_valido CHECK (hora_desde < hora_hasta)
+-- 8. TABLA MOVIMIENTO (HU3, HU9)
+--------------------------------------------------------------------------------
+CREATE TABLE movimiento (
+    id BIGSERIAL PRIMARY KEY,
+    cuenta_id BIGINT NOT NULL,
+    tipo tipo_movimiento_enum NOT NULL,
+    moneda moneda_enum NOT NULL,
+    monto NUMERIC(18, 2) NOT NULL,
+    fecha TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    descripcion TEXT,
+
+    CONSTRAINT fk_movimiento_cuenta FOREIGN KEY (cuenta_id) 
+        REFERENCES cuenta(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+        
+    CONSTRAINT chk_movimiento_monto CHECK (monto > 0)
 );
 
--- 8. Viajes (HU5, HU6, HU7, HU11, HU13)
-CREATE TABLE viajes (
-    id SERIAL PRIMARY KEY,
-    pasajero_id INTEGER NOT NULL REFERENCES pasajeros(id),
-    conductor_id INTEGER REFERENCES conductores(id), -- NULL inicialmente (HU5)
-    vehiculo_id INTEGER REFERENCES vehiculos(id),
-    metodo_pago_id INTEGER NOT NULL REFERENCES metodos_pago(id),
-    cupon_id INTEGER REFERENCES cupones(id),
-    origen TEXT NOT NULL,
-    destino TEXT NOT NULL,
-    distancia_km NUMERIC(10, 2) NOT NULL CHECK (distancia_km > 0),
-    fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    fecha_inicio TIMESTAMP,
-    fecha_fin TIMESTAMP,
-    estado VARCHAR(20) DEFAULT 'pendiente' 
-        CHECK (estado IN ('pendiente', 'asignado', 'en_curso', 'finalizado', 'cancelado', 'sin_conductor')),
-    tarifa_final NUMERIC(10, 2) NOT NULL, -- Se guarda el cálculo final (HU5)
-    multiplicador_aplicado NUMERIC(3, 2) DEFAULT 1.0
+-- 9. TABLA DIVIDENDO (HU9)
+--------------------------------------------------------------------------------
+CREATE TABLE dividendo (
+    id BIGSERIAL PRIMARY KEY,
+    activo_id BIGINT NOT NULL,
+    monto_por_unidad NUMERIC(18, 4) NOT NULL,
+    fecha_pago TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT fk_dividendo_activo FOREIGN KEY (activo_id) 
+        REFERENCES activo(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+        
+    CONSTRAINT chk_monto_por_unidad CHECK (monto_por_unidad > 0)
 );
 
--- 9. Calificaciones (HU8)
-CREATE TABLE calificaciones (
-    id SERIAL PRIMARY KEY,
-    viaje_id INTEGER NOT NULL UNIQUE REFERENCES viajes(id),
-    puntaje_pasajero INTEGER CHECK (puntaje_pasajero BETWEEN 1 AND 5),
-    puntaje_conductor INTEGER CHECK (puntaje_conductor BETWEEN 1 AND 5),
-    comentario TEXT
-);
+-- =============================================================================
+-- ÍNDICES RECOMENDADOS PARA OPTIMIZAR LAS BUSQUEDAS Y REPORTES
+-- =============================================================================
 
--- 10. Cargos / Penalidades (HU12)
-CREATE TABLE cargos (
-    id SERIAL PRIMARY KEY,
-    viaje_id INTEGER NOT NULL REFERENCES viajes(id),
-    monto NUMERIC(10, 2) NOT NULL,
-    motivo VARCHAR(100) DEFAULT 'Penalidad por cancelación tardía'
-);
+-- HU2: GET /activos filtra por tipo y moneda
+CREATE INDEX idx_activo_tipo_moneda ON activo(tipo, moneda);
 
--- 11. Tabla pivote para uso de cupones (HU13 - Para que no se repita por pasajero)
-CREATE TABLE cupones_usados (
-    pasajero_id INTEGER REFERENCES pasajeros(id),
-    cupon_id INTEGER REFERENCES cupones(id),
-    PRIMARY KEY (pasajero_id, cupon_id)
-);
+-- HU11: Historial de operaciones por cuenta, rango de fechas, tipo y activo
+CREATE INDEX idx_operacion_cuenta_fecha ON operacion(cuenta_id, fecha DESC);
+CREATE INDEX idx_operacion_activo_id ON operacion(activo_id);
+
+-- HU12: Ranking de activos más operados en los últimos 7 días
+CREATE INDEX idx_operacion_fecha_activo ON operacion(fecha, activo_id);
+
+-- HU12: Ranking de favoritos
+CREATE INDEX idx_favorito_activo ON favorito(activo_id);
+
+-- HU11/HU12: Búsquedas por movimiento y dividendos por fecha
+CREATE INDEX idx_movimiento_cuenta_fecha ON movimiento(cuenta_id, fecha DESC);
+CREATE INDEX idx_dividendo_activo_fecha ON dividendo(activo_id, fecha_pago DESC);

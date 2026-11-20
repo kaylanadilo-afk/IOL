@@ -1,0 +1,174 @@
+Proyecto 6 — IOL (InvertirOnline)
+Broker de bolsa argentino. Los inversores abren una cuenta comitente, depositan pesos o dólares, compran y venden acciones, CEDEARs y bonos en horario de mercado, cobran dividendos y ven el rendimiento de su cartera.
+
+Entidades sugeridas
+Inversor (id, email, nombre, cuit, perfil_riesgo, fecha_alta)
+Cuenta (id, inversor_id, numero_comitente, saldo_ars, saldo_usd)
+Activo (id, ticker, nombre, tipo, moneda, precio_actual, nivel_riesgo, activo)
+Operacion (id, cuenta_id, activo_id, tipo, cantidad, precio_unitario, comision, total, fecha, estado)
+Movimiento (id, cuenta_id, tipo, moneda, monto, fecha, descripcion)
+Dividendo (id, activo_id, monto_por_unidad, fecha_pago)
+Relación N a M tenencias (cuenta_id, activo_id, cantidad, precio_promedio)
+Relación N a M favoritos (inversor_id, activo_id)
+Historias de usuario
+HU1 — Alta de inversor y cuenta
+Como visitante, quiero abrir una cuenta comitente.
+
+ El email y el cuit son únicos; el CUIT tiene 11 dígitos.
+ Al darse de alta se crea su Cuenta con numero_comitente único y saldos en 0.
+ perfil_riesgo es conservador, moderado o agresivo.
+HU2 — Catálogo de activos
+Como administrador, quiero cargar los activos que se pueden operar.
+
+ ticker es único (ej: GGAL, YPFD, AAPL, AL30).
+ tipo es accion, cedear o bono; moneda es ARS o USD.
+ precio_actual mayor a 0 y nivel_riesgo de 1 a 5.
+ GET /activos filtra por tipo y moneda.
+HU3 — Depósitos y extracciones
+Como inversor, quiero ingresar y retirar plata.
+
+ Cada depósito o extracción genera un Movimiento en la moneda correspondiente.
+ El monto es mayor a 0.
+ No se puede extraer más que el saldo disponible en esa moneda.
+HU4 — Comprar activo
+Como inversor, quiero comprar un activo.
+
+ Solo se opera de lunes a viernes de 11:00 a 17:00; fuera de horario la operación se rechaza.
+ Se descuenta de la moneda del activo: total = cantidad * precio_actual + comision.
+ La comisión es el 0,5% del monto operado.
+ El saldo tiene que alcanzar para cubrir el total.
+ Se actualiza la tenencia y su precio_promedio ponderado.
+HU5 — Perfil de riesgo
+Como broker, quiero evitar que un inversor compre algo que no corresponde a su perfil.
+
+ Un conservador solo compra activos con nivel_riesgo ≤ 2; un moderado, ≤ 4; un agresivo, cualquiera.
+ Si no corresponde, la compra se rechaza indicando el motivo.
+ El inversor puede actualizar su perfil con PATCH /inversores/{id}/perfil.
+HU6 — Vender activo
+Como inversor, quiero vender lo que tengo.
+
+ No se puede vender más cantidad de la que se tiene en tenencia.
+ Se acredita cantidad * precio_actual - comision en la moneda del activo.
+ Si la tenencia queda en 0, se elimina.
+ La operación guarda la ganancia o pérdida realizada respecto del precio_promedio.
+HU7 — Dólar MEP
+Como inversor, quiero pasar pesos a dólares con el bono AL30.
+
+ POST /cuentas/{id}/mep recibe un monto en ARS.
+ Se registra una compra de AL30 en pesos y una venta de AL30D en dólares (dos Operacion).
+ El tipo de cambio aplicado se calcula como precio AL30 / precio AL30D y se devuelve en la respuesta.
+ Si alguna de las dos patas falla, no se guarda ninguna.
+HU8 — Actualizar precios
+Como administrador, quiero actualizar el precio de los activos.
+
+ PATCH /activos/{id}/precio recibe un precio mayor a 0.
+ No se puede operar un activo con activo = false (suspendido).
+ Las operaciones pasadas mantienen su precio_unitario original.
+HU9 — Pago de dividendos
+Como administrador, quiero registrar el pago de un dividendo.
+
+ Solo para activos de tipo accion o cedear.
+ Al registrarlo, a cada cuenta que tiene el activo se le acredita cantidad * monto_por_unidad.
+ Cada acreditación genera un Movimiento de tipo dividendo.
+HU10 — Cartera valorizada
+Como inversor, quiero ver cuánto vale mi cartera.
+
+ GET /cuentas/{id}/cartera devuelve cada tenencia con cantidad, precio promedio, precio actual, valor actual y rendimiento %.
+ Incluye el total valorizado por moneda y los saldos disponibles.
+ Incluye la composición % por tipo de activo.
+HU11 — Historial de operaciones
+Como inversor, quiero ver mis operaciones.
+
+ GET /cuentas/{id}/operaciones filtra por rango de fechas, tipo y ticker.
+ Incluye total de comisiones pagadas en el período.
+ Ordenado por fecha descendente.
+HU12 — Rankings del mercado
+Como inversor, quiero ver qué se está operando.
+
+ GET /activos/mas-operados devuelve los 10 activos con más volumen operado en los últimos 7 días.
+ GET /activos/mas-favoritos devuelve los 10 más marcados como favoritos.
+ GET /cuentas/{id}/ganancias-realizadas devuelve la ganancia o pérdida realizada total por año.
+
+
+Realizame el frontend de IOL hecho en typescript con los endpoints comentados para yo completarlo con mi API de mi backend
+La estructura de mi proyecto de backend es la siguiente:
+
+proyecto/
+├── src/
+│   ├── db/
+│   │   ├── connection.py          # engine, SessionLocal, Base
+│   │   ├── models/                # definiciones de tablas (SQLAlchemy)
+│   │   │   ├── __init__.py
+│   │   │   ├── user_model.py
+│   │   │   ├── product_model.py
+│   │   │   └── order_model.py
+│   │   ├── migrations/            # Alembic
+│   │   │   └── versions/
+│   │   └── seeders/
+│   │       └── users_seeder.py
+│   │
+│   ├── schemas/                   # validación de entrada (Pydantic)
+│   │   ├── __init__.py
+│   │   ├── user_schema.py
+│   │   ├── product_schema.py
+│   │   └── auth_schema.py
+│   │
+│   ├── dtos/                      # contratos entre capas (Pydantic)
+│   │   ├── __init__.py
+│   │   ├── user_dto.py
+│   │   ├── product_dto.py
+│   │   └── auth_dto.py
+│   │
+│   ├── mappers/                   # Model ⇄ DTO
+│   │   ├── __init__.py
+│   │   ├── user_mapper.py
+│   │   └── product_mapper.py
+│   │
+│   ├── repositories/              # acceso a datos (queries)
+│   │   ├── __init__.py
+│   │   ├── user_repository.py
+│   │   └── product_repository.py
+│   │
+│   ├── services/                  # lógica de negocio
+│   │   ├── __init__.py
+│   │   ├── user_service.py
+│   │   ├── product_service.py
+│   │   └── auth_service.py
+│   │
+│   ├── routers/                   # endpoints (FastAPI APIRouter)
+│   │   ├── __init__.py
+│   │   ├── user_router.py
+│   │   ├── product_router.py
+│   │   └── auth_router.py
+│   │
+│   ├── middlewares/
+│   │   ├── __init__.py
+│   │   ├── auth_middleware.py     # JWT / sesión
+│   │   ├── error_middleware.py    # captura excepciones
+│   │   └── logger_middleware.py
+│   │
+│   ├── config/
+│   │   ├── __init__.py
+│   │   ├── env.py                 # carga .env y valida con Pydantic Settings
+│   │   └── constants.py
+│   │
+│   ├── utils/
+│   │   ├── __init__.py
+│   │   ├── hash.py
+│   │   ├── jwt.py
+│   │   └── errors.py              # AppError, NotFoundError, etc.
+│   │
+│   ├── app.py                     # crea la app FastAPI, registra middlewares y routers
+│   └── main.py                    # punto de entrada (uvicorn)
+│
+├── tests/
+│   ├── unit/
+│   └── integration/
+│
+├── .env
+├── .env.example
+├── .gitignore
+├── requirements.txt
+└── pyproject.toml
+
+
