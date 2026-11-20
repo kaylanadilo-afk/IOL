@@ -88,10 +88,9 @@ export function PortfolioChartCard({ title }: { title: string }) {
       <div className="ctitle">
         <div>
           <h2>{title}</h2>
-          <div className="sname">
-            Lo que tenés hoy, valuado con los cierres de cada día
-            {data?.variacion_pct != null && <>: <b className={cls(data.variacion_pct)}>{pct(data.variacion_pct)}</b> en el período</>}
-          </div>
+          {data?.variacion_pct != null && (
+            <div className="chart-var"><b className={cls(data.variacion_pct)}>{pct(data.variacion_pct)}</b></div>
+          )}
         </div>
         <div className="tabs">
           {RANGOS.map(([v, l]) => (
@@ -109,7 +108,7 @@ export function PortfolioChartCard({ title }: { title: string }) {
 }
 
 /* ===================== DISPONIBLE (ARS / USD) ===================== */
-export function CashButton({ saldos }: { saldos: Cartera["saldos_disponibles"] }) {
+export function CashButton({ saldos, oculto = false }: { saldos: Cartera["saldos_disponibles"]; oculto?: boolean }) {
   const [cur, setCur] = useState<"ARS" | "USD">("ARS");
   const [flip, setFlip] = useState(0);
   const { vibrar } = useUI();
@@ -121,8 +120,7 @@ export function CashButton({ saldos }: { saldos: Cartera["saldos_disponibles"] }
       onClick={() => { setCur(cur === "ARS" ? "USD" : "ARS"); setFlip((f) => f + 1); vibrar(6); }}
     >
       <small>Disponible para operar <span className="seg"><i className={cur === "ARS" ? "on" : ""}>ARS</i><i className={cur === "USD" ? "on" : ""}>USD</i></span></small>
-      <span key={flip} className={`amt${flip ? " flip" : ""}`}>{money(saldos[cur], cur)}</span>
-      <small>{cur === "ARS" ? "Tocá para ver tus dólares" : "Tocá para ver tus pesos"}</small>
+      <span key={flip} className={`amt${flip ? " flip" : ""}`}>{oculto ? `${cur === "USD" ? "US$" : "$"} ••••••` : money(saldos[cur], cur)}</span>
     </button>
   );
 }

@@ -273,7 +273,38 @@ tbody tr:last-child td{border-bottom:0}
 .bar{height:6px;border-radius:3px;background:var(--brand2)}
 
 /* ===================== PERFIL ===================== */
-.pf-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:20px;align-items:center;margin-bottom:12px}
+.pf-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:20px;align-items:center;margin-bottom:12px}
+.pf-gear{align-self:start;display:grid;place-items:center;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--muted);transition:color .15s,border-color .15s,transform .3s}
+.pf-gear svg{width:21px;height:21px}
+.pf-gear:hover{color:var(--text);border-color:var(--accent)}
+.pf-gear:hover svg{transform:rotate(45deg);transition:transform .3s}
+.back-link{display:inline-block;color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:500;margin-bottom:4px}
+.back-link:hover{color:var(--text)}
+.cfg-head h1{margin:0}
+/* Ojito del inicio: oculta los montos */
+.hero-label{display:flex;align-items:center;gap:6px}
+.hide-btn{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;padding:0}
+.hide-btn:hover{background:var(--card2);color:var(--text)}
+.hide-btn svg{width:19px;height:19px}
+.montos-ocultos .priv,.montos-ocultos .chart .ylab,.montos-ocultos .chart .tip{filter:blur(7px);user-select:none}
+.chart-var{font-size:15px;margin-top:2px}
+/* Mi cartera: tarjetas de resumen */
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
+.kpi2{position:relative;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:18px;display:flex;flex-direction:column;gap:4px;min-width:0;overflow:hidden}
+.kpi2 .ico{display:grid;place-items:center;width:36px;height:36px;border-radius:11px;background:var(--accentBg);color:var(--brand2);margin-bottom:10px}
+.kpi2 .ico svg{width:19px;height:19px}
+.kpi2 .ico.usd{background:var(--upBg);color:var(--up)}
+.kpi2 .ico.cash{background:var(--warnBg);color:var(--warn)}
+.kpi2 small{color:var(--muted);font-size:12.5px;font-weight:500;letter-spacing:.01em}
+.kpi2 strong{font-size:24px;font-weight:600;letter-spacing:-.03em;line-height:1.15;word-break:break-word}
+.kpi2 .foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12.5px;color:var(--muted);margin-top:6px}
+.kpi2.feat{background:linear-gradient(135deg,#0E1A2B 0%,#17304F 100%);border-color:transparent;color:#fff}
+.kpi2.feat::after{content:"";position:absolute;right:-40px;top:-40px;width:150px;height:150px;border-radius:50%;background:radial-gradient(circle,rgba(91,155,213,.35),transparent 70%)}
+.kpi2.feat .ico{background:rgba(255,255,255,.12);color:#fff}
+.kpi2.feat small,.kpi2.feat .foot{color:rgba(255,255,255,.72)}
+[data-theme="dark"] .kpi2.feat{background:linear-gradient(135deg,#1B3556 0%,#14243C 100%);border-color:#24406A}
+.cart-sec{display:flex;align-items:baseline;justify-content:space-between;margin:22px 2px 10px}
+.cart-sec h2{font-size:17px;margin:0;letter-spacing:-.02em}
 .avatar-lg{width:84px;height:84px;font-size:28px;box-shadow:0 0 0 3px var(--card),0 0 0 5px var(--accent)}
 .pf-name{font-size:24px;font-weight:600;letter-spacing:-.03em;margin:0}
 .pf-mail{color:var(--muted);font-size:14px;margin:2px 0 8px}
@@ -331,7 +362,9 @@ tbody tr:last-child td{border-bottom:0}
 .toast.bad{background:var(--down);color:#fff}
 
 @media(max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.g2e,.gtrade,.g3{grid-template-columns:minmax(0,1fr)}.main{padding:22px 20px 36px}
-  .home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-grid,.cols2{grid-template-columns:minmax(0,1fr)}.pf-hero{grid-template-columns:auto minmax(0,1fr)}.pf-stats{grid-column:1/-1}}
+  .home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-grid,.cols2{grid-template-columns:minmax(0,1fr)}.pf-hero{grid-template-columns:auto minmax(0,1fr)}.pf-stats{grid-column:1/-1}
+  .pf-hero{grid-template-columns:auto minmax(0,1fr) auto}.pf-gear{grid-row:1;grid-column:3}
+  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* ===================== CELULAR (estilo app, menú abajo) ===================== */
 @media(min-width:801px){.only-m{display:none!important}}
@@ -356,6 +389,8 @@ tbody tr:last-child td{border-bottom:0}
   .hero{grid-template-columns:minmax(0,1fr);gap:12px;margin-bottom:12px}
   .hero-num{font-size:clamp(34px,11vw,48px)}
   .home-grid{grid-template-columns:minmax(0,1fr)}.home-grid .span2{grid-column:auto}
+  .kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.kpis .feat,.kpis .kpi2:last-child{grid-column:1/-1}
+  .kpi2{padding:14px}.kpi2 strong{font-size:19px}.kpi2 .ico{margin-bottom:6px}
   .home-chart{height:170px}
   .pf-hero{grid-template-columns:auto minmax(0,1fr);gap:14px}.avatar-lg{width:68px;height:68px;font-size:23px}.pf-name{font-size:20px}
   .pf-stats{grid-template-columns:repeat(4,minmax(0,1fr))}.pf-stats div{padding:8px 4px}.pf-stats b{font-size:15px}

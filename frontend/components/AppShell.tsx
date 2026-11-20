@@ -105,7 +105,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             <div className="profile-pop" role="menu" aria-label="Opciones de la cuenta">
               <div className="pp-head"><span className="avatar">{ini}</span><div style={{ minWidth: 0 }}><b>{me.nombre}</b><small>{me.email}</small></div></div>
               <Link href="/perfil" className="pp-item" role="menuitem"><span className="mi">◉</span>Ver mi perfil</Link>
-              <Link href="/perfil#password" className="pp-item" role="menuitem"><span className="mi">⚿</span>Cambiar contraseña</Link>
+              <Link href="/perfil/configuracion#password" className="pp-item" role="menuitem"><span className="mi">⚿</span>Cambiar contraseña</Link>
               <button type="button" className="pp-item" role="menuitem" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
                 <span className="mi">◐</span>Modo oscuro<span className="switch" aria-hidden="true" />
               </button>
