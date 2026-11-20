@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import src.db.models  # noqa: F401  registra todos los modelos en Base.metadata
 from src.config.env import settings
+from src.db import migraciones
 from src.db.connection import Base, engine
 from src.middlewares.error_middleware import app_error_handler, validation_error_handler
 from src.routers import (activos_router, auth_router, conductores_router, cuentas_router, inversores_router,
@@ -19,6 +20,7 @@ from src.utils.errors import AppError
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     Base.metadata.create_all(engine)  # crea las tablas que falten
+    migraciones.aplicar(engine)  # agrega las columnas nuevas a tablas que ya existían
     tarea = asyncio.create_task(precios_service.bucle_precios()) if precios_service.activado() else None
     yield
     if tarea:

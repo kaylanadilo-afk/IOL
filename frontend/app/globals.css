@@ -86,6 +86,14 @@ body:not(.is-admin) .admin-only{display:none!important}
 .field-err{display:flex;gap:6px;align-items:flex-start;margin:0;color:var(--down);font-size:12.5px;font-weight:500;line-height:1.35;animation:fadeIn .15s ease}
 .field-err svg{width:15px;height:15px;flex:0 0 auto;margin-top:1px}
 .field-hint{margin:0;color:var(--muted);font-size:12.5px}
+/* Confirmación del correo */
+.verif-ico{display:grid;place-items:center;width:48px;height:48px;border-radius:14px;background:var(--accentBg);color:var(--brand2)}
+.verif-ico svg{width:24px;height:24px}
+.verif-mail{color:var(--text);word-break:break-all}
+.otp{font-size:26px!important;font-weight:600;letter-spacing:.5em;text-align:center;padding:14px!important;font-variant-numeric:tabular-nums}
+.otp::placeholder{color:var(--line)}
+.verif-acciones{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:13px}
+.verif-aviso{margin:10px 0 0;color:var(--up);font-size:13px;font-weight:500}
 .checking-wrap .field input{background-image:linear-gradient(90deg,transparent,var(--accentBg),transparent);background-size:200% 100%;animation:shimmer 1s linear infinite}
 @keyframes shimmer{to{background-position:-200% 0}}
 

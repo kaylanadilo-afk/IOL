@@ -3,11 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { api, ApiError } from "@/lib/api";
-import type { Perfil } from "@/lib/types";
+import type { Perfil, Sesion } from "@/lib/types";
 import { errorCuit, errorEmail, errorNombre, errorPassword, formatoCuit } from "@/lib/validaciones";
 import { useSession } from "@/context/SessionContext";
 import { useUI } from "@/context/UIContext";
-import { PasswordField, TextField } from "@/components/ui";
+import { FieldError, PasswordField, TextField } from "@/components/ui";
 
 type CampoAlta = "nombre" | "email" | "cuit" | "password" | "perfil_riesgo";
 type Errores = Partial<Record<CampoAlta, string>>;
@@ -29,6 +29,8 @@ export default function LoginPage() {
   const [errores, setErrores] = useState<Errores>({});
   const [revisandoEmail, setRevisandoEmail] = useState(false);
   const emailRevisado = useRef("");
+  // Correo pendiente de confirmar: mientras haya uno, se muestra la pantalla del código
+  const [verificando, setVerificando] = useState<string | null>(null);
 
   // Con sesión abierta se va directo a la app (el administrador, a su sección)
   useEffect(() => {
@@ -63,7 +65,11 @@ export default function LoginPage() {
       await ingresar(sesion);
       setPass("");
     } catch (error) {
-      setErr((error as Error).message);
+      if (error instanceof ApiError && error.codigo === "EmailNoVerificadoError") {
+        setVerificando(email.trim().toLowerCase());
+      } else {
+        setErr((error as Error).message);
+      }
     } finally {
       setBusy(false);
     }
@@ -108,9 +114,13 @@ export default function LoginPage() {
     if (primero) return enfocar(ID[primero]);
     setBusy(true);
     try {
-      // Se crea la cuenta y enseguida se ingresa con la misma contraseña
+      // Se crea la cuenta; si hay que confirmar el correo, se pide el código que le llegó
       const datos = { ...alta, cuit: alta.cuit.replace(/\D/g, "") };
       const inv = await api.crearInversor(datos);
+      if (!inv.email_verificado) {
+        setVerificando(inv.email);
+        return;
+      }
       toast(`Cuenta comitente N° ${inv.cuenta?.numero_comitente} creada.`);
       await ingresar(await api.ingresar(datos.email, datos.password));
     } catch (error) {
@@ -140,6 +150,11 @@ export default function LoginPage() {
           </div>
         </header>
         <div className="login-card">
+          {verificando ? (
+            <VerificarCorreo email={verificando}
+              onListo={async (s) => { toast(`¡Listo! Tu cuenta comitente N° ${s.inversor.cuenta?.numero_comitente} está activa.`); await ingresar(s); }}
+              onVolver={() => { setVerificando(null); setErr(""); }} />
+          ) : (<>
           {tab === "admin" ? (
             <div className="admin-badge">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z" /></svg>
@@ -187,12 +202,85 @@ export default function LoginPage() {
           </form>
         )}
         <div className="err" role="alert">{err}</div>
+          </>)}
         </div>
       </div>
       <button type="button" className="login-admin" onClick={() => irA(tab === "admin" ? "in" : "admin")}>
         {tab === "admin" ? "← Volver al ingreso de inversores" : "Ingresar como administrador"}
       </button>
     </section>
+  );
+}
+
+/* ===================== CONFIRMAR EL CORREO ===================== */
+function VerificarCorreo({ email, onListo, onVolver }: { email: string; onListo: (s: Sesion) => Promise<void>; onVolver: () => void }) {
+  const [codigo, setCodigo] = useState("");
+  const [error, setError] = useState("");
+  const [aviso, setAviso] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [espera, setEspera] = useState(60);
+
+  // Cuenta regresiva para poder pedir otro código
+  useEffect(() => {
+    if (espera <= 0) return;
+    const t = setTimeout(() => setEspera((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [espera]);
+
+  const confirmar = async (valor = codigo) => {
+    if (valor.length !== 6) return setError("Ingresá los 6 dígitos del código");
+    setBusy(true);
+    setError("");
+    try {
+      await onListo(await api.verificarEmail(email, valor));
+    } catch (e) {
+      setError(e instanceof ApiError ? (e.campos.codigo ?? e.message) : (e as Error).message);
+      setCodigo("");
+      requestAnimationFrame(() => document.getElementById("codigo")?.focus());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reenviar = async () => {
+    setError("");
+    try {
+      const r = await api.reenviarCodigo(email);
+      setEspera(r.espera);
+      setAviso("Te mandamos un código nuevo.");
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  };
+
+  return (
+    <form onSubmit={(e) => { e.preventDefault(); confirmar(); }} noValidate>
+      <div className="verif-ico" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="5" width="18" height="14" rx="2.5" /><path d="m4 7 8 6 8-6" /></svg>
+      </div>
+      <h1>Confirmá tu correo</h1>
+      <p className="login-sub">Te mandamos un código de 6 dígitos a <b className="verif-mail">{email}</b>. Si no lo ves, revisá la carpeta de spam.</p>
+      <div className={`field${error ? " invalid" : ""}`}>
+        <label htmlFor="codigo">Código de verificación</label>
+        <input id="codigo" className="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus
+          placeholder="000000" value={codigo} aria-invalid={!!error} aria-describedby={error ? "codigo-err" : undefined}
+          onChange={(e) => {
+            const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+            setCodigo(v);
+            setError("");
+            if (v.length === 6) confirmar(v); // al completar los 6 dígitos se confirma solo
+          }} />
+        <FieldError id="codigo" error={error} />
+      </div>
+      <button className="btn btn-primary full" type="submit" disabled={busy}>{busy ? "Confirmando…" : "Confirmar correo"}</button>
+      <div className="verif-acciones">
+        {espera > 0
+          ? <span className="muted">Podés pedir otro código en {espera} s</span>
+          : <button type="button" className="link-btn" onClick={reenviar}>Reenviar código</button>}
+        <button type="button" className="link-btn" onClick={onVolver}>Usar otro correo</button>
+      </div>
+      {aviso && !error && <p className="verif-aviso" role="status">{aviso}</p>}
+    </form>
   );
 }
 

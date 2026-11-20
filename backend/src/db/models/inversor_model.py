@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, String, Table
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Table
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.connection import Base
@@ -42,6 +42,12 @@ class Inversor(Base):
     es_admin: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     # Hash scrypt de la contraseña (nunca el texto). Ver src/utils/seguridad.py
     password_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Confirmación del correo con un código de 6 dígitos (se guarda solo su hash)
+    email_verificado: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    codigo_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    codigo_expira: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    codigo_enviado: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    codigo_intentos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     cuenta: Mapped["Cuenta"] = relationship(back_populates="inversor", uselist=False)
     favoritos: Mapped[list["Activo"]] = relationship(secondary=favoritos, order_by="Activo.ticker")

@@ -34,6 +34,11 @@ def verificar(password: str, guardado: str | None) -> bool:
     return hmac.compare_digest(h.hex(), h_hex)
 
 
+def hash_codigo(inversor_id: int, codigo: str) -> str:
+    """Hash del código de verificación (atado al inversor, para que no sirva en otra cuenta)."""
+    return hmac.new(_CLAVE, f"{inversor_id}:{codigo}".encode(), hashlib.sha256).hexdigest()
+
+
 def _b64(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 

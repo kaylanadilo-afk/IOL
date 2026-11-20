@@ -27,6 +27,12 @@ class ForbiddenError(AppError):
     message = "Forbidden"
 
 
+class EmailNoVerificadoError(ForbiddenError):
+    """La cuenta existe y la contraseña es correcta, pero falta confirmar el correo."""
+
+    message = "Confirmá tu correo para ingresar. Te mandamos un código."
+
+
 class ConflictError(AppError):
     status_code = 409
     message = "Conflict"

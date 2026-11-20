@@ -31,6 +31,7 @@ class InversorDTO(OrmDTO):
     perfil_riesgo: str
     fecha_alta: Fecha
     es_admin: bool = False
+    email_verificado: bool = True
     cuenta: CuentaDTO | None = None
 
 

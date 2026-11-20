@@ -9,6 +9,7 @@ import os
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("JWT_SECRET", "test")
 os.environ["VALIDAR_EMAIL_DNS"] = "0"  # sin consultas a internet
+os.environ["VERIFICAR_EMAIL"] = "0"  # las cuentas de prueba quedan confirmadas
 from datetime import datetime
 
 import pytest

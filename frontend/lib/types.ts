@@ -22,6 +22,8 @@ export interface Inversor {
   perfil_riesgo: Perfil;
   fecha_alta: string;
   es_admin: boolean;
+  /** false hasta que confirma el correo con el código que se le manda. */
+  email_verificado: boolean;
   cuenta: Cuenta | null;
 }
 

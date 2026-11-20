@@ -1,6 +1,8 @@
 """Validaciones de datos personales para el alta de cuentas (email y CUIT)."""
 import os
 import re
+import secrets
+import smtplib
 
 from email_validator import EmailNotValidError, EmailUndeliverableError, validate_email
 
@@ -34,7 +36,44 @@ def validar_email(v: str) -> str:
         if "special-use or reserved" in str(e):
             raise ValueError("Ese dominio no se puede usar para correos. Usá una dirección real") from None
         raise ValueError("Ingresá un correo válido, por ejemplo nombre@gmail.com") from None
-    return r.normalized.lower()
+    email = r.normalized.lower()
+    if dns and casilla_existe(email, [mx for _, mx in (getattr(r, "mx", None) or [])]) is False:
+        raise ValueError("Esta casilla de correo no existe. Revisá que esté bien escrita")
+    return email
+
+
+def _rcpt(servidor: smtplib.SMTP, email: str) -> int:
+    return servidor.rcpt(email)[0]
+
+
+def casilla_existe(email: str, mx: list[str]) -> bool | None:
+    """Le pregunta al servidor de correo del dominio si la casilla existe, sin mandar ningún mensaje.
+
+    True: el servidor la acepta. False: responde que no existe (por ejemplo Gmail con 550 5.1.1).
+    None: no se puede saber (no contesta, bloquea la consulta o acepta cualquier dirección); en ese
+    caso no se rechaza y la confirmación queda a cargo del código que se manda por email.
+    """
+    if not mx:
+        return None
+    dominio = email.rsplit("@", 1)[1]
+    try:
+        with smtplib.SMTP(mx[0].rstrip("."), 25, timeout=8, local_hostname="mail.zeno.investments") as s:
+            s.ehlo()
+            if s.mail("")[0] != 250:
+                return None
+            codigo, texto = s.rcpt(email)
+            texto = texto.decode(errors="ignore").lower()
+            # Solo cuenta como "no existe" un rechazo del destinatario (5.1.x), no un bloqueo por spam (5.7.x)
+            if codigo in (550, 551, 553) and ("5.1." in texto or "does not exist" in texto or "no such user" in texto
+                                              or "unknown user" in texto or "user unknown" in texto):
+                return False
+            if codigo == 250:
+                # Algunos servidores aceptan cualquier dirección: así no se puede saber
+                inventada = f"zeno-{secrets.token_hex(6)}@{dominio}"
+                return None if _rcpt(s, inventada) == 250 else True
+    except (OSError, smtplib.SMTPException):
+        return None
+    return None
 
 
 def digito_verificador_cuit(base: str) -> int | None:

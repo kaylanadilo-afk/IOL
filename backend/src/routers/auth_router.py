@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, Header
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
@@ -24,6 +25,26 @@ def login(payload: LoginSchema, db: Session = Depends(get_db)):
              summary="Ingresar con email y contraseña. Devuelve un token de sesión")
 def ingresar(payload: IngresarSchema, db: Session = Depends(get_db)):
     return InversorService(db).ingresar(payload.email, payload.password)
+
+
+class VerificarEmailSchema(BaseModel):
+    email: str
+    codigo: str
+
+
+class ReenviarCodigoSchema(BaseModel):
+    email: str
+
+
+@router.post("/verificar-email", response_model=SesionDTO, tags=["Sesión"],
+             summary="Confirma el correo con el código de 6 dígitos y abre la sesión")
+def verificar_email(payload: VerificarEmailSchema, db: Session = Depends(get_db)):
+    return InversorService(db).verificar_email(payload.email, payload.codigo)
+
+
+@router.post("/reenviar-codigo", tags=["Sesión"], summary="Manda otro código de verificación (uno por minuto)")
+def reenviar_codigo(payload: ReenviarCodigoSchema, db: Session = Depends(get_db)):
+    return InversorService(db).reenviar_codigo(payload.email)
 
 
 @router.get("/yo", response_model=InversorDTO, tags=["Sesión"],
