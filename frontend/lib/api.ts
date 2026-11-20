@@ -31,7 +31,8 @@ export function guardarToken(t: string | null): void {
 }
 
 export class ApiError extends Error {
-  constructor(message: string, public status: number) {
+  /** Errores por campo del formulario (por ejemplo { email: "Ya existe una cuenta con este correo" }). */
+  constructor(message: string, public status: number, public campos: Record<string, string> = {}) {
     super(message);
   }
 }
@@ -54,11 +55,11 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     data = null;
   }
   if (!res.ok) {
-    const d = data as { detail?: unknown; message?: unknown } | null;
+    const d = data as { detail?: unknown; message?: unknown; campos?: Record<string, string> } | null;
     const msg = d?.detail ?? d?.message;
     const texto = msg == null ? (res.status >= 500 ? "No se pudo conectar con la API. ¿Está corriendo el backend?" : `Error ${res.status}`)
       : typeof msg === "string" ? msg : JSON.stringify(msg);
-    throw new ApiError(texto, res.status);
+    throw new ApiError(texto, res.status, d?.campos ?? {});
   }
   return data as T;
 }
@@ -75,6 +76,7 @@ export const api = {
   ingresar: (email: string, password: string) => request<Sesion>("POST", "/auth/ingresar", { email, password }),
   yo: () => request<Inversor>("GET", "/auth/yo"),
   crearInversor: (datos: InversorCrear) => request<Inversor>("POST", "/inversores", datos),
+  validarEmail: (email: string) => request<{ valido: boolean; email: string; mensaje: string | null }>("POST", "/inversores/validar-email", { email }),
   inversor: (id: number) => request<Inversor>("GET", `/inversores/${id}`),
   cambiarPerfil: (id: number, perfil_riesgo: Perfil) => request<Inversor>("PATCH", `/inversores/${id}/perfil`, { perfil_riesgo }),
   cambiarPassword: (id: number, actual: string, nueva: string) =>

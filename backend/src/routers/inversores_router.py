@@ -1,10 +1,12 @@
 from fastapi import APIRouter, Depends, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
 from src.dtos.broker_dto import ActivoDTO, InversorDTO, PasswordCambiadaDTO
 from src.schemas.broker_schema import CambiarPasswordSchema, CreateInversorSchema, UpdatePerfilSchema
 from src.services.inversor_service import InversorService
+from src.utils.validaciones import validar_email
 
 router = APIRouter(prefix="/inversores", tags=["Inversores"])
 
@@ -13,6 +15,19 @@ router = APIRouter(prefix="/inversores", tags=["Inversores"])
 def alta_inversor(payload: CreateInversorSchema, db: Session = Depends(get_db)):
     """HU1: alta de inversor + cuenta comitente con saldos en 0."""
     return InversorService(db).crear(**payload.model_dump())
+
+
+class ValidarEmailSchema(BaseModel):
+    email: str
+
+
+@router.post("/validar-email", summary="Revisa si un correo tiene formato válido y un dominio que recibe emails")
+def validar_email_alta(payload: ValidarEmailSchema):
+    """Lo usa el formulario de alta para avisar del error apenas se completa el campo."""
+    try:
+        return {"valido": True, "email": validar_email(payload.email), "mensaje": None}
+    except ValueError as e:
+        return {"valido": False, "email": payload.email, "mensaje": str(e)}
 
 
 @router.get("/{inversor_id}", response_model=InversorDTO)

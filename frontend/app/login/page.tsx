@@ -1,12 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { api } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { api, ApiError } from "@/lib/api";
 import type { Perfil } from "@/lib/types";
+import { errorCuit, errorEmail, errorNombre, errorPassword, formatoCuit } from "@/lib/validaciones";
 import { useSession } from "@/context/SessionContext";
 import { useUI } from "@/context/UIContext";
-import { PasswordField } from "@/components/ui";
+import { PasswordField, TextField } from "@/components/ui";
+
+type CampoAlta = "nombre" | "email" | "cuit" | "password" | "perfil_riesgo";
+type Errores = Partial<Record<CampoAlta, string>>;
+const ORDEN: CampoAlta[] = ["nombre", "email", "cuit", "password"];
+const ID: Record<CampoAlta, string> = { nombre: "altaNombre", email: "altaEmail", cuit: "altaCuit", password: "altaPass", perfil_riesgo: "altaPerfil" };
 
 export default function LoginPage() {
   const { estado, ingresar } = useSession();
@@ -16,9 +22,13 @@ export default function LoginPage() {
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
-  const [email, setEmail] = useState("alumno@aula.test");
+  const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [loginErr, setLoginErr] = useState<{ email?: string; pass?: string }>({});
   const [alta, setAlta] = useState({ nombre: "", email: "", cuit: "", password: "", perfil_riesgo: "moderado" as Perfil });
+  const [errores, setErrores] = useState<Errores>({});
+  const [revisandoEmail, setRevisandoEmail] = useState(false);
+  const emailRevisado = useRef("");
 
   // Con sesión abierta se va directo a la app (el administrador, a su sección)
   useEffect(() => {
@@ -29,12 +39,19 @@ export default function LoginPage() {
     setTab(t);
     setErr("");
     setPass("");
+    setLoginErr({});
+    setErrores({});
     if (t === "admin") setEmail("");
   };
 
+  const enfocar = (id: string) => requestAnimationFrame(() => document.getElementById(id)?.focus());
+
   const onLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!pass) return setErr("Escribí tu contraseña.");
+    setErr("");
+    const errs = { email: errorEmail(email) ?? undefined, pass: pass ? undefined : "Ingresá tu contraseña" };
+    setLoginErr(errs);
+    if (errs.email || errs.pass) return enfocar(errs.email ? "loginEmail" : "loginPass");
     setBusy(true);
     try {
       const sesion = await api.ingresar(email, pass);
@@ -52,24 +69,63 @@ export default function LoginPage() {
     }
   };
 
+  // Cada campo se revisa al salir de él; el error se va apenas se corrige
+  const validar = (k: CampoAlta, v: string): string | null =>
+    k === "nombre" ? errorNombre(v) : k === "email" ? errorEmail(v) : k === "cuit" ? errorCuit(v) : k === "password" ? errorPassword(v) : null;
+
+  const setA = (k: CampoAlta) => (v: string) => {
+    const valor = k === "cuit" ? formatoCuit(v) : v;
+    setAlta((a) => ({ ...a, [k]: valor }));
+    if (errores[k]) setErrores((er) => ({ ...er, [k]: validar(k, valor) ?? undefined }));
+  };
+
+  const alSalir = (k: CampoAlta) => {
+    const v = alta[k];
+    if (!v) return; // no se marca en rojo un campo que todavía no se llenó
+    const msg = validar(k, v);
+    setErrores((er) => ({ ...er, [k]: msg ?? undefined }));
+    // El formato está bien: la API revisa que el dominio del correo exista y reciba emails
+    if (k === "email" && !msg && emailRevisado.current !== v) {
+      emailRevisado.current = v;
+      setRevisandoEmail(true);
+      api.validarEmail(v)
+        .then((r) => { if (!r.valido && r.mensaje) setErrores((er) => ({ ...er, email: r.mensaje ?? undefined })); })
+        .catch(() => { /* si no se puede revisar ahora, lo revisa la API al crear la cuenta */ })
+        .finally(() => setRevisandoEmail(false));
+    }
+  };
+
   const onAlta = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!/^\d{11}$/.test(alta.cuit.replace(/[-\s]/g, ""))) return setErr("El CUIT tiene que tener 11 dígitos.");
-    if (alta.password.length < 8) return setErr("La contraseña tiene que tener al menos 8 caracteres.");
+    setErr("");
+    const errs: Errores = {};
+    for (const k of ORDEN) {
+      const m = validar(k, alta[k]);
+      if (m) errs[k] = m;
+    }
+    setErrores(errs);
+    const primero = ORDEN.find((k) => errs[k]);
+    if (primero) return enfocar(ID[primero]);
     setBusy(true);
     try {
       // Se crea la cuenta y enseguida se ingresa con la misma contraseña
-      const inv = await api.crearInversor(alta);
+      const datos = { ...alta, cuit: alta.cuit.replace(/\D/g, "") };
+      const inv = await api.crearInversor(datos);
       toast(`Cuenta comitente N° ${inv.cuenta?.numero_comitente} creada.`);
-      await ingresar(await api.ingresar(alta.email, alta.password));
+      await ingresar(await api.ingresar(datos.email, datos.password));
     } catch (error) {
-      setErr((error as Error).message);
+      const campos = error instanceof ApiError ? (error.campos as Errores) : {};
+      const conCampo = Object.keys(campos).filter((k): k is CampoAlta => k in ID);
+      if (conCampo.length) {
+        setErrores((er) => ({ ...er, ...campos }));
+        enfocar(ID[ORDEN.find((k) => campos[k]) ?? conCampo[0]]);
+      } else {
+        setErr((error as Error).message);
+      }
     } finally {
       setBusy(false);
     }
   };
-
-  const setA = (k: keyof typeof alta) => (v: string) => setAlta({ ...alta, [k]: v });
 
   return (
     <section className="login">
@@ -80,7 +136,7 @@ export default function LoginPage() {
           <img className="brand-mark" src="/brand/zeno-mark.png" alt="" />
           <div>
             <span className="wordmark">Zeno <span>Investments</span></span>
-            <p>Broker educativo<span className="hide-sm"> · Mercado argentino</span></p>
+            <p>Mercado de capitales<span className="hide-sm"> · Argentina</span></p>
           </div>
         </header>
         <div className="login-card">
@@ -100,23 +156,28 @@ export default function LoginPage() {
           <form onSubmit={onLogin} noValidate>
             <h1>{tab === "admin" ? "Administración" : "Ingresá a tu cuenta"}</h1>
             {tab === "admin" && <p className="login-sub">Ingresá con una cuenta de administrador.</p>}
-            <div className="field">
-              <label htmlFor="loginEmail">Email</label>
-              <input id="loginEmail" type="email" autoComplete="username" placeholder={tab === "admin" ? "admin@empresa.com" : "tu@email.com"} value={email} onChange={(e) => setEmail(e.target.value)} />
-            </div>
-            <PasswordField id="loginPass" label="Contraseña" autoComplete="current-password" value={pass} onChange={setPass} />
+            <TextField id="loginEmail" label="Email" type="email" autoComplete="username" placeholder={tab === "admin" ? "admin@empresa.com" : "tu@email.com"}
+              value={email} error={loginErr.email} onChange={(v) => { setEmail(v); if (loginErr.email) setLoginErr((l) => ({ ...l, email: errorEmail(v) ?? undefined })); }} />
+            <PasswordField id="loginPass" label="Contraseña" autoComplete="current-password" value={pass} error={loginErr.pass}
+              onChange={(v) => { setPass(v); if (v) setLoginErr((l) => ({ ...l, pass: undefined })); }} />
             <button className="btn btn-primary full" type="submit" disabled={busy}>{tab === "admin" ? "Ingresar como administrador" : "Ingresar"}</button>
           </form>
         ) : (
           <form onSubmit={onAlta} noValidate>
             <h1>Crear cuenta</h1>
-            <div className="field"><label htmlFor="altaNombre">Nombre y apellido</label><input id="altaNombre" autoComplete="name" value={alta.nombre} onChange={(e) => setA("nombre")(e.target.value)} /></div>
-            <div className="field"><label htmlFor="altaEmail">Email</label><input id="altaEmail" type="email" autoComplete="email" value={alta.email} onChange={(e) => setA("email")(e.target.value)} /></div>
-            <div className="field"><label htmlFor="altaCuit">CUIT (11 dígitos)</label><input id="altaCuit" inputMode="numeric" placeholder="20-12345678-9" value={alta.cuit} onChange={(e) => setA("cuit")(e.target.value)} /></div>
-            <PasswordField id="altaPass" label="Contraseña (mínimo 8 caracteres)" autoComplete="new-password" value={alta.password} onChange={setA("password")} />
+            <TextField id="altaNombre" label="Nombre y apellido" autoComplete="name" value={alta.nombre} error={errores.nombre}
+              onChange={setA("nombre")} onBlur={() => alSalir("nombre")} />
+            <div className={revisandoEmail ? "checking-wrap" : undefined}>
+              <TextField id="altaEmail" label="Email" type="email" autoComplete="email" placeholder="nombre@gmail.com" value={alta.email}
+                error={errores.email} onChange={setA("email")} onBlur={() => alSalir("email")} />
+            </div>
+            <TextField id="altaCuit" label="CUIT" inputMode="numeric" placeholder="20-12345678-9" value={alta.cuit} error={errores.cuit}
+              hint="Lo encontrás en tu constancia de AFIP o en tu DNI (CUIL)." onChange={setA("cuit")} onBlur={() => alSalir("cuit")} />
+            <PasswordField id="altaPass" label="Contraseña" autoComplete="new-password" value={alta.password} error={errores.password}
+              hint="Mínimo 8 caracteres." onChange={setA("password")} onBlur={() => alSalir("password")} />
             <div className="field">
               <label htmlFor="altaPerfil">Perfil de riesgo</label>
-              <select id="altaPerfil" value={alta.perfil_riesgo} onChange={(e) => setA("perfil_riesgo")(e.target.value)}>
+              <select id="altaPerfil" value={alta.perfil_riesgo} onChange={(e) => setAlta((a) => ({ ...a, perfil_riesgo: e.target.value as Perfil }))}>
                 <option value="conservador">Conservador (riesgo hasta 2)</option>
                 <option value="moderado">Moderado (riesgo hasta 4)</option>
                 <option value="agresivo">Agresivo (cualquier riesgo)</option>
@@ -125,7 +186,7 @@ export default function LoginPage() {
             <button className="btn btn-primary full" type="submit" disabled={busy}>Crear cuenta</button>
           </form>
         )}
-        <div className="err" aria-live="polite">{err}</div>
+        <div className="err" role="alert">{err}</div>
         </div>
       </div>
       <button type="button" className="login-admin" onClick={() => irA(tab === "admin" ? "in" : "admin")}>

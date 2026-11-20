@@ -6,6 +6,8 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
+from src.utils.validaciones import validar_cuit, validar_email, validar_nombre
+
 Perfil = Literal["conservador", "moderado", "agresivo"]
 TipoActivo = Literal["accion", "cedear", "bono"]
 Moneda = Literal["ARS", "USD"]
@@ -24,11 +26,11 @@ def _positivo(v: Decimal, campo: str, decimales: int) -> Decimal:
 
 def validar_password(v: str) -> str:
     if len(v) < 8:
-        raise ValueError("la contraseña tiene que tener al menos 8 caracteres")
+        raise ValueError("La contraseña tiene que tener al menos 8 caracteres")
     if len(v) > 128:
-        raise ValueError("la contraseña puede tener hasta 128 caracteres")
+        raise ValueError("La contraseña puede tener hasta 128 caracteres")
     if v.strip() != v:
-        raise ValueError("la contraseña no puede empezar ni terminar con espacios")
+        raise ValueError("La contraseña no puede empezar ni terminar con espacios")
     return v
 
 
@@ -45,29 +47,22 @@ class CreateInversorSchema(BaseModel):
     def _password(cls, v: str) -> str:
         return validar_password(v)
 
+    # El correo tiene que tener formato válido y un dominio que exista y reciba emails;
+    # el CUIT, un prefijo de AFIP y el dígito verificador correcto
     @field_validator("email")
     @classmethod
     def _email(cls, v: str) -> str:
-        v = v.strip().lower()
-        if not EMAIL_RE.match(v) or len(v) > 254:
-            raise ValueError("email inválido")
-        return v
+        return validar_email(v)
 
     @field_validator("nombre")
     @classmethod
     def _nombre(cls, v: str) -> str:
-        v = v.strip()
-        if not 1 <= len(v) <= 120:
-            raise ValueError("el nombre es obligatorio (máx. 120 caracteres)")
-        return v
+        return validar_nombre(v)
 
     @field_validator("cuit")
     @classmethod
     def _cuit(cls, v: str) -> str:
-        v = v.replace("-", "").replace(" ", "")
-        if not re.fullmatch(r"\d{11}", v):
-            raise ValueError("el CUIT tiene que tener 11 dígitos")
-        return v
+        return validar_cuit(v)
 
 
 class UpdatePerfilSchema(BaseModel):

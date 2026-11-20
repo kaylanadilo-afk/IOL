@@ -11,8 +11,8 @@ const instrument = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Zeno Investments | Broker educativo",
-  description: "Simulador de broker: acciones, CEDEARs, bonos y dólar MEP con precios reales.",
+  title: "Zeno Investments",
+  description: "Invertí en acciones, CEDEARs, bonos y dólar MEP con precios de mercado en tiempo real.",
   manifest: "/manifest.webmanifest",
   appleWebApp: { capable: true, title: "Zeno", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },

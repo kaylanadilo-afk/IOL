@@ -83,7 +83,7 @@ export function StarButton({ a }: { a: Activo }) {
 export function textoMercado(m: { abierto: boolean; en_horario: boolean } | null): string {
   if (!m) return "…";
   if (!m.abierto) return "Mercado cerrado";
-  return m.en_horario ? "Mercado abierto" : "Abierto (demo)";
+  return m.en_horario ? "Mercado abierto" : "Mercado abierto 24 h";
 }
 
 export function MercadoPill() {
@@ -104,15 +104,45 @@ export function MontoHero({ n, cur }: { n: number; cur: string }) {
   return <>{s.slice(0, i)}<span className="cts">{s.slice(i)}</span></>;
 }
 
-export function PasswordField({ id, label, autoComplete, value, onChange }: {
+/** Mensaje de error debajo de un campo, con ícono (se lee en voz alta al aparecer). */
+export function FieldError({ id, error }: { id: string; error?: string | null }) {
+  if (!error) return null;
+  return (
+    <p className="field-err" id={`${id}-err`} role="alert">
+      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1 5h2v7h-2zm0 9h2v2h-2z" /></svg>
+      {error}
+    </p>
+  );
+}
+
+type InputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "id" | "onChange" | "value">;
+
+/** Campo de texto con etiqueta y error: si hay error, el borde y la etiqueta se ponen en rojo. */
+export function TextField({ id, label, value, onChange, error, hint, ...input }: InputProps & {
+  id: string; label: string; value: string; onChange: (v: string) => void; error?: string | null; hint?: string;
+}) {
+  return (
+    <div className={`field${error ? " invalid" : ""}`}>
+      <label htmlFor={id}>{label}</label>
+      <input id={id} value={value} onChange={(e) => onChange(e.target.value)} aria-invalid={!!error}
+        aria-describedby={error ? `${id}-err` : hint ? `${id}-hint` : undefined} {...input} />
+      {error ? <FieldError id={id} error={error} /> : hint && <p className="field-hint" id={`${id}-hint`}>{hint}</p>}
+    </div>
+  );
+}
+
+export function PasswordField({ id, label, autoComplete, value, onChange, error, hint, onBlur }: {
   id: string; label: string; autoComplete: string; value: string; onChange: (v: string) => void;
+  error?: string | null; hint?: string; onBlur?: () => void;
 }) {
   const [ver, setVer] = useState(false);
   return (
-    <div className="field pass-field">
+    <div className={`field pass-field${error ? " invalid" : ""}`}>
       <label htmlFor={id}>{label}</label>
-      <input id={id} type={ver ? "text" : "password"} autoComplete={autoComplete} value={value} onChange={(e) => onChange(e.target.value)} />
-      <button type="button" className="eye" aria-label={ver ? "Ocultar contraseña" : "Mostrar contraseña"} onClick={() => setVer(!ver)}>
+      <div className="input-wrap">
+        <input id={id} type={ver ? "text" : "password"} autoComplete={autoComplete} value={value} onChange={(e) => onChange(e.target.value)}
+          onBlur={onBlur} aria-invalid={!!error} aria-describedby={error ? `${id}-err` : hint ? `${id}-hint` : undefined} />
+        <button type="button" className="eye" aria-label={ver ? "Ocultar contraseña" : "Mostrar contraseña"} onClick={() => setVer(!ver)}>
         {ver ? (
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M3 3l18 18" /><path d="M10.6 5.1A9.9 9.9 0 0 1 12 5c5 0 8.5 4.2 9.6 6.2a1.6 1.6 0 0 1 0 1.6 16 16 0 0 1-2.8 3.5" />
@@ -123,7 +153,9 @@ export function PasswordField({ id, label, autoComplete, value, onChange }: {
             <path d="M2.4 12.8a1.6 1.6 0 0 1 0-1.6C3.5 9.2 7 5 12 5s8.5 4.2 9.6 6.2a1.6 1.6 0 0 1 0 1.6C20.5 14.8 17 19 12 19s-8.5-4.2-9.6-6.2z" /><circle cx="12" cy="12" r="3" />
           </svg>
         )}
-      </button>
+        </button>
+      </div>
+      {error ? <FieldError id={id} error={error} /> : hint && <p className="field-hint" id={`${id}-hint`}>{hint}</p>}
     </div>
   );
 }

@@ -1,7 +1,7 @@
 {
-  "name": "Zeno Investments · Broker educativo",
+  "name": "Zeno Investments",
   "short_name": "Zeno",
-  "description": "Simulador de broker: acciones, CEDEARs, bonos y dólar MEP con precios reales de BYMA.",
+  "description": "Invertí en acciones, CEDEARs, bonos y dólar MEP con precios de mercado en tiempo real.",
   "id": "/",
   "start_url": "/?app=pwa",
   "scope": "/",

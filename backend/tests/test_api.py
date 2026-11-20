@@ -18,31 +18,48 @@ def test_alta_crea_cuenta_con_saldos_en_cero(client):
 
 def test_email_y_cuit_unicos(client):
     inv = nuevo_inversor(client, email="a@test.com")
-    r = client.post("/inversores", json={"email": "A@test.com", "nombre": "x", "cuit": "20999999990", "perfil_riesgo": "moderado", "password": "clave-segura"})
-    assert r.status_code == 409 and "email" in r.json()["detail"]
-    r = client.post("/inversores", json={"email": "b@test.com", "nombre": "x", "cuit": inv["cuit"], "perfil_riesgo": "moderado", "password": "clave-segura"})
-    assert r.status_code == 409 and "CUIT" in r.json()["detail"]
+    r = client.post("/inversores", json={"email": "A@test.com", "nombre": "Ana Test", "cuit": "20411111106", "perfil_riesgo": "moderado", "password": "clave-segura"})
+    assert r.status_code == 409 and r.json()["campos"] == {"email": "Ya existe una cuenta con este correo"}
+    r = client.post("/inversores", json={"email": "b@test.com", "nombre": "Ana Test", "cuit": inv["cuit"], "perfil_riesgo": "moderado", "password": "clave-segura"})
+    assert r.status_code == 409 and "CUIT" in r.json()["campos"]["cuit"]
 
 
 @pytest.mark.parametrize("cuit", ["123", "2011111111A", "201111111123"])
 def test_cuit_11_digitos(client, cuit):
-    r = client.post("/inversores", json={"email": "c@test.com", "nombre": "x", "cuit": cuit, "perfil_riesgo": "moderado", "password": "clave-segura"})
+    r = client.post("/inversores", json={"email": "c@test.com", "nombre": "Ana Test", "cuit": cuit, "perfil_riesgo": "moderado", "password": "clave-segura"})
     assert r.status_code == 422 and "11 dígitos" in r.json()["detail"]
 
 
+@pytest.mark.parametrize("cuit,motivo", [("20111111113", "dígito verificador"), ("12111111112", "tiene que empezar")])
+def test_cuit_invalido(client, cuit, motivo):
+    r = client.post("/inversores", json={"email": "c@test.com", "nombre": "Ana Test", "cuit": cuit, "perfil_riesgo": "moderado", "password": "clave-segura"})
+    assert r.status_code == 422 and motivo in r.json()["campos"]["cuit"]
+
+
+@pytest.mark.parametrize("email", ["sin-arroba", "a@b", "dos@@test.com"])
+def test_email_invalido(client, email):
+    r = client.post("/inversores", json={"email": email, "nombre": "Ana Test", "cuit": "20411111122", "perfil_riesgo": "moderado", "password": "clave-segura"})
+    assert r.status_code == 422 and "email" in r.json()["campos"]
+
+
+def test_nombre_y_apellido(client):
+    r = client.post("/inversores", json={"email": "n@test.com", "nombre": "Ana", "cuit": "20411111122", "perfil_riesgo": "moderado", "password": "clave-segura"})
+    assert r.status_code == 422 and "apellido" in r.json()["campos"]["nombre"]
+
+
 def test_cuit_con_guiones_se_normaliza(client):
-    r = client.post("/inversores", json={"email": "d@test.com", "nombre": "x", "cuit": "20-11111111-2", "perfil_riesgo": "moderado", "password": "clave-segura"})
+    r = client.post("/inversores", json={"email": "d@test.com", "nombre": "Ana Test", "cuit": "20-11111111-2", "perfil_riesgo": "moderado", "password": "clave-segura"})
     assert r.status_code == 201 and r.json()["cuit"] == "20111111112"
 
 
 def test_alta_nunca_crea_administradores(client):
-    r = client.post("/inversores", json={"email": "x@test.com", "nombre": "x", "cuit": "20999999991",
+    r = client.post("/inversores", json={"email": "x@test.com", "nombre": "Ana Test", "cuit": "20411111114",
                                          "perfil_riesgo": "moderado", "es_admin": True, "password": "clave-segura"})
     assert r.status_code == 201 and r.json()["es_admin"] is False
 
 
 def test_perfil_invalido(client):
-    r = client.post("/inversores", json={"email": "e@test.com", "nombre": "x", "cuit": "20111111112", "perfil_riesgo": "temerario", "password": "clave-segura"})
+    r = client.post("/inversores", json={"email": "e@test.com", "nombre": "Ana Test", "cuit": "20111111112", "perfil_riesgo": "temerario", "password": "clave-segura"})
     assert r.status_code == 422
 
 
@@ -51,7 +68,7 @@ def test_catalogo_y_filtros(client):
     nuevo_activo(client, "GGAL")
     nuevo_activo(client, "AAPL", tipo="cedear")
     nuevo_activo(client, "GD30", tipo="bono", moneda="USD", precio=0.9)
-    assert client.post("/activos", json={"ticker": "ggal", "nombre": "x", "tipo": "accion", "moneda": "ARS",
+    assert client.post("/activos", json={"ticker": "ggal", "nombre": "Ana Test", "tipo": "accion", "moneda": "ARS",
                                          "precio_actual": 1, "nivel_riesgo": 1}).status_code == 409
     assert [a["ticker"] for a in client.get("/activos?tipo=cedear").json()] == ["AAPL"]
     assert [a["ticker"] for a in client.get("/activos?moneda=USD").json()] == ["GD30"]
@@ -61,7 +78,7 @@ def test_catalogo_y_filtros(client):
 @pytest.mark.parametrize("campo,valor", [("precio_actual", 0), ("precio_actual", -5), ("nivel_riesgo", 0),
                                          ("nivel_riesgo", 6), ("tipo", "fondo"), ("moneda", "EUR")])
 def test_activo_validaciones(client, campo, valor):
-    datos = {"ticker": "X", "nombre": "x", "tipo": "accion", "moneda": "ARS", "precio_actual": 10, "nivel_riesgo": 3}
+    datos = {"ticker": "X", "nombre": "Ana Test", "tipo": "accion", "moneda": "ARS", "precio_actual": 10, "nivel_riesgo": 3}
     datos[campo] = valor
     assert client.post("/activos", json=datos).status_code == 422
 
@@ -367,3 +384,9 @@ def test_404(client):
     assert client.get("/cuentas/999/cartera").status_code == 404
     assert client.get("/activos/999").status_code == 404
     assert client.patch("/inversores/999/perfil", json={"perfil_riesgo": "moderado", "password": "clave-segura"}).status_code == 404
+
+
+def test_validar_email_para_el_formulario(client):
+    assert client.post("/inversores/validar-email", json={"email": "Ana@Test.com"}).json()["valido"] is True
+    r = client.post("/inversores/validar-email", json={"email": "ana@"}).json()
+    assert r["valido"] is False and r["mensaje"]

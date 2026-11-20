@@ -60,13 +60,15 @@ def crear_admin(db) -> None:
     (así la contraseña real no queda en el repositorio).
     """
     repo, servicio = InversorRepository(db), InversorService(db)
+    email, clave = os.getenv("ADMIN_EMAIL"), os.getenv("ADMIN_PASSWORD")
+    if email and clave:
+        if not repo.find_by_email(email):
+            servicio.crear(email, os.getenv("ADMIN_NOMBRE", "Administración"), os.getenv("ADMIN_CUIT", "30711111111"),
+                           "agresivo", clave, es_admin=True)
+        return
     if not repo.find_by_email(ADMIN[0]):
         e, n, c, p = ADMIN
         servicio.crear(e, n, c, p, PASSWORD_DEMO, es_admin=True)
-    email, clave = os.getenv("ADMIN_EMAIL"), os.getenv("ADMIN_PASSWORD")
-    if email and clave and not repo.find_by_email(email):
-        servicio.crear(email, os.getenv("ADMIN_NOMBRE", "Administración"), os.getenv("ADMIN_CUIT", "30733333334"),
-                       "agresivo", clave, es_admin=True)
 
 
 def dia_habil(dias_atras: int, hora: int = 12) -> datetime:
@@ -160,7 +162,7 @@ def main() -> None:
             for inv in sin_clave:
                 inv.password_hash = seguridad.hashear(PASSWORD_DEMO)
             db.commit()
-            print(f"La base ya tenía datos: administrador listo (admin@aula.test) y {len(sin_clave)} usuarios sin "
+            print(f"La base ya tenía datos: administrador listo ({os.getenv('ADMIN_EMAIL') or ADMIN[0]}) y {len(sin_clave)} usuarios sin "
                   f"contraseña quedaron con {PASSWORD_DEMO!r}. Usá --reset para recargar todo.")
             return
         cargar(db)

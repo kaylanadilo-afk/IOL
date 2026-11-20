@@ -30,9 +30,9 @@ class InversorService:
     def crear(self, email: str, nombre: str, cuit: str, perfil_riesgo: str, password: str,
               es_admin: bool = False) -> InversorDTO:
         if self.repo.find_by_email(email):
-            raise ConflictError("Ya existe un inversor con ese email")
+            raise ConflictError("Ya existe una cuenta con este correo", campo="email")
         if self.repo.find_by_cuit(cuit):
-            raise ConflictError("Ya existe un inversor con ese CUIT")
+            raise ConflictError("Ya existe una cuenta con este CUIT", campo="cuit")
         inv = self.repo.add(Inversor(email=email, nombre=nombre, cuit=cuit, perfil_riesgo=perfil_riesgo,
                                      es_admin=es_admin, password_hash=seguridad.hashear(password)))
         siguiente = (self.cuentas.max_numero_comitente() or 100000) + 1

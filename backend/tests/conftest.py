@@ -8,6 +8,7 @@ import os
 # La config exige estas variables; los tests usan SQLite en memoria
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("JWT_SECRET", "test")
+os.environ["VALIDAR_EMAIL_DNS"] = "0"  # sin consultas a internet
 from datetime import datetime
 
 import pytest
@@ -69,14 +70,23 @@ def client(reloj, monkeypatch):
 
 
 # ---------- helpers ----------
-_cuit = iter(range(20000000001, 20999999999))
+def _cuits_validos():
+    """CUITs con dígito verificador correcto, distintos para cada inversor de prueba."""
+    from src.utils.validaciones import digito_verificador_cuit
+    for base in range(2000000000, 2099999999):
+        d = digito_verificador_cuit(str(base))
+        if d is not None:
+            yield f"{base}{d}"
+
+
+_cuit = _cuits_validos()
 PASSWORD = "clave-segura"
 
 
 def nuevo_inversor(client, perfil="agresivo", email=None):
     n = next(_cuit)
     r = client.post("/inversores", json={
-        "email": email or f"inv{n}@test.com", "nombre": "Test", "cuit": str(n), "perfil_riesgo": perfil,
+        "email": email or f"inv{n}@test.com", "nombre": "Test Prueba", "cuit": n, "perfil_riesgo": perfil,
         "password": PASSWORD})
     assert r.status_code == 201, r.text
     return r.json()

@@ -15,7 +15,7 @@ def test_la_contrasena_se_guarda_hasheada():
 
 
 def test_alta_exige_contrasena_de_8_caracteres(client):
-    base = {"email": "p@test.com", "nombre": "x", "cuit": "20444444445", "perfil_riesgo": "moderado"}
+    base = {"email": "p@test.com", "nombre": "Ana Test", "cuit": "20411111130", "perfil_riesgo": "moderado"}
     r = client.post("/inversores", json=base)
     assert r.status_code == 422
     r = client.post("/inversores", json={**base, "password": "corta"})
