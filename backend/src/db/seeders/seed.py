@@ -3,6 +3,7 @@
     python -m src.db.seeders.seed            -> crea tablas y carga datos si la base está vacía
     python -m src.db.seeders.seed --reset    -> borra las tablas del broker y vuelve a cargar
 """
+import os
 import sys
 from datetime import datetime, time, timedelta
 from decimal import Decimal as D
@@ -53,11 +54,19 @@ TABLAS_BROKER = ("favoritos", "operaciones", "movimientos", "tenencias", "divide
 
 
 def crear_admin(db) -> None:
-    """Perfil autorizado para la sección de Administración (activos, precios, dividendos)."""
-    if InversorRepository(db).find_by_email(ADMIN[0]):
-        return
-    e, n, c, p = ADMIN
-    InversorService(db).crear(e, n, c, p, PASSWORD_DEMO, es_admin=True)
+    """Perfiles autorizados para la sección de Administración (activos, precios, dividendos).
+
+    Además del admin de ejemplo, si el .env define ADMIN_EMAIL y ADMIN_PASSWORD se crea esa cuenta
+    (así la contraseña real no queda en el repositorio).
+    """
+    repo, servicio = InversorRepository(db), InversorService(db)
+    if not repo.find_by_email(ADMIN[0]):
+        e, n, c, p = ADMIN
+        servicio.crear(e, n, c, p, PASSWORD_DEMO, es_admin=True)
+    email, clave = os.getenv("ADMIN_EMAIL"), os.getenv("ADMIN_PASSWORD")
+    if email and clave and not repo.find_by_email(email):
+        servicio.crear(email, os.getenv("ADMIN_NOMBRE", "Administración"), os.getenv("ADMIN_CUIT", "30733333334"),
+                       "agresivo", clave, es_admin=True)
 
 
 def dia_habil(dias_atras: int, hora: int = 12) -> datetime:

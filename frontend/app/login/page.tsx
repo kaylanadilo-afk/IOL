@@ -12,7 +12,7 @@ export default function LoginPage() {
   const { estado, ingresar } = useSession();
   const { toast } = useUI();
   const router = useRouter();
-  const [tab, setTab] = useState<"in" | "alta">("in");
+  const [tab, setTab] = useState<"in" | "alta" | "admin">("in");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -20,17 +20,30 @@ export default function LoginPage() {
   const [pass, setPass] = useState("");
   const [alta, setAlta] = useState({ nombre: "", email: "", cuit: "", password: "", perfil_riesgo: "moderado" as Perfil });
 
-  // Con sesión abierta se va directo a la app
+  // Con sesión abierta se va directo a la app (el administrador, a su sección)
   useEffect(() => {
-    if (estado === "listo") router.replace("/");
-  }, [estado, router]);
+    if (estado === "listo") router.replace(tab === "admin" ? "/admin" : "/");
+  }, [estado, router, tab]);
+
+  const irA = (t: typeof tab) => {
+    setTab(t);
+    setErr("");
+    setPass("");
+    if (t === "admin") setEmail("");
+  };
 
   const onLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!pass) return setErr("Escribí tu contraseña.");
     setBusy(true);
     try {
-      await ingresar(await api.ingresar(email, pass));
+      const sesion = await api.ingresar(email, pass);
+      // El acceso de administración es solo para cuentas con ese permiso
+      if (tab === "admin" && !sesion.inversor.es_admin) {
+        setErr("Esta cuenta no tiene permisos de administrador.");
+        return;
+      }
+      await ingresar(sesion);
       setPass("");
     } catch (error) {
       setErr((error as Error).message);
@@ -61,26 +74,38 @@ export default function LoginPage() {
   return (
     <section className="login">
       <LoginBackdrop />
-      <div className="login-card">
-        <div className="brand">
+      <div className="login-main">
+        <header className="login-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img className="brand-mark" src="/icons/icon-192.png" alt="" />
-          <span className="wordmark">IOL <span>Aula</span></span>
-        </div>
-        <div className="tabs">
-          <button type="button" className={`tab${tab === "in" ? " active" : ""}`} onClick={() => { setTab("in"); setErr(""); }}>Ingresar</button>
-          <button type="button" className={`tab${tab === "alta" ? " active" : ""}`} onClick={() => { setTab("alta"); setErr(""); }}>Crear cuenta</button>
-        </div>
+          <div>
+            <span className="wordmark">IOL <span>Aula</span></span>
+            <p>Broker educativo<span className="hide-sm"> · Mercado argentino</span></p>
+          </div>
+        </header>
+        <div className="login-card">
+          {tab === "admin" ? (
+            <div className="admin-badge">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z" /></svg>
+              Acceso restringido
+            </div>
+          ) : (
+            <div className="tabs">
+              <button type="button" className={`tab${tab === "in" ? " active" : ""}`} onClick={() => irA("in")}>Ingresar</button>
+              <button type="button" className={`tab${tab === "alta" ? " active" : ""}`} onClick={() => irA("alta")}>Crear cuenta</button>
+            </div>
+          )}
 
-        {tab === "in" ? (
+        {tab !== "alta" ? (
           <form onSubmit={onLogin} noValidate>
-            <h1>Ingresá a tu cuenta</h1>
+            <h1>{tab === "admin" ? "Administración" : "Ingresá a tu cuenta"}</h1>
+            {tab === "admin" && <p className="login-sub">Ingresá con una cuenta de administrador.</p>}
             <div className="field">
               <label htmlFor="loginEmail">Email</label>
-              <input id="loginEmail" type="email" autoComplete="username" placeholder="tu@email.com" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <input id="loginEmail" type="email" autoComplete="username" placeholder={tab === "admin" ? "admin@empresa.com" : "tu@email.com"} value={email} onChange={(e) => setEmail(e.target.value)} />
             </div>
             <PasswordField id="loginPass" label="Contraseña" autoComplete="current-password" value={pass} onChange={setPass} />
-            <button className="btn btn-primary full" type="submit" disabled={busy}>Ingresar</button>
+            <button className="btn btn-primary full" type="submit" disabled={busy}>{tab === "admin" ? "Ingresar como administrador" : "Ingresar"}</button>
           </form>
         ) : (
           <form onSubmit={onAlta} noValidate>
@@ -101,7 +126,11 @@ export default function LoginPage() {
           </form>
         )}
         <div className="err" aria-live="polite">{err}</div>
+        </div>
       </div>
+      <button type="button" className="login-admin" onClick={() => irA(tab === "admin" ? "in" : "admin")}>
+        {tab === "admin" ? "← Volver al ingreso de inversores" : "Ingresar como administrador"}
+      </button>
     </section>
   );
 }

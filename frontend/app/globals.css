@@ -50,7 +50,7 @@ body:not(.is-admin) .admin-only{display:none!important}
 
 /* ===================== LOGIN ===================== */
 .login{position:relative;overflow:hidden;isolation:isolate;min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px;background:var(--bg)}
-.login-card{position:relative;width:min(440px,100%);background:var(--card);border:1px solid var(--line);border-radius:24px;padding:32px;box-shadow:var(--pop)}
+.login-card{position:relative;width:100%;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:32px;box-shadow:var(--pop)}
 /* Fondo del login: manchas de color, cuadrícula y cotizaciones de adorno */
 .login-bg{position:absolute;inset:0;z-index:-1;pointer-events:none}
 .login-glow{position:absolute;border-radius:50%;filter:blur(80px);opacity:.55}
@@ -59,8 +59,17 @@ body:not(.is-admin) .admin-only{display:none!important}
 .login-grid{position:absolute;inset:0;background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:48px 48px;opacity:.6;-webkit-mask-image:radial-gradient(ellipse at center,#000 20%,transparent 75%);mask-image:radial-gradient(ellipse at center,#000 20%,transparent 75%)}
 .login-lines{position:absolute;left:0;right:0;bottom:0;width:100%;height:55%}
 [data-theme="dark"] .login-glow{opacity:.8}
-.login-card .brand{display:flex;align-items:center;gap:12px;margin-bottom:36px}
-.login-card .brand .brand-mark{width:44px;height:44px;border-radius:13px}
+.login-main{width:min(440px,100%);display:flex;flex-direction:column;align-items:center;gap:28px}
+.login-brand{display:flex;align-items:center;gap:16px}
+.login-brand .brand-mark{width:60px;height:60px;border-radius:17px;box-shadow:0 10px 30px rgba(10,143,92,.28)}
+.login-brand .wordmark{font-size:34px;line-height:1}
+.login-brand p{margin:7px 0 0;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.login-card h1{margin-top:20px}
+.login-sub{color:var(--muted);margin:0 0 14px}
+.admin-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:var(--warnBg);color:var(--warn);font-size:12.5px;font-weight:600}
+.admin-badge svg{width:15px;height:15px}
+.login-admin{position:absolute;left:20px;bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;opacity:.75;cursor:pointer;padding:6px 8px;border-radius:8px}
+.login-admin:hover{opacity:1;color:var(--text)}
 .login-card h1{font-size:30px;margin:22px 0 4px;letter-spacing:-.03em}
 .login-card .btn-primary{padding:13px;margin-top:6px}
 .field{display:grid;gap:6px;margin:14px 0}
@@ -296,7 +305,8 @@ tbody tr:last-child td{border-bottom:0}
 .copy:hover{background:var(--card2);color:var(--text)}
 .pass-field{position:relative}
 .pass-field input{padding-right:42px}
-.eye{position:absolute;right:6px;bottom:6px;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px 8px;border-radius:8px;font-size:13px}
+.eye{position:absolute;right:6px;bottom:6px;display:grid;place-items:center;border:0;background:transparent;color:var(--muted);cursor:pointer;padding:6px 8px;border-radius:8px}
+.eye svg{width:20px;height:20px}
 .eye:hover{color:var(--text)}
 .pref-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
 .pref-row:last-child{border-bottom:0}
@@ -418,6 +428,11 @@ tbody tr:last-child td{border-bottom:0}
   .install-banner .x{background:transparent;border:0;color:var(--muted);font-size:20px;cursor:pointer;padding:0 4px}
   .login{align-items:start;padding:calc(48px + env(safe-area-inset-top)) 22px 22px}
   .login-card{padding:24px 20px;border-radius:20px}
+  .login{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
+  .login-main{gap:22px}
+  .login-brand .brand-mark{width:50px;height:50px;border-radius:15px}
+  .login-brand .wordmark{font-size:28px}
+  .login-brand .hide-sm{display:none}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:560px){.g4{grid-template-columns:minmax(0,1fr)}.chart{height:230px}}
