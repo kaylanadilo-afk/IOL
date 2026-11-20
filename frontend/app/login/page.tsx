@@ -60,6 +60,7 @@ export default function LoginPage() {
 
   return (
     <section className="login">
+      <LoginBackdrop />
       <div className="login-card">
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -102,5 +103,38 @@ export default function LoginPage() {
         <div className="err" aria-live="polite">{err}</div>
       </div>
     </section>
+  );
+}
+
+/* ===================== FONDO DECORATIVO ===================== */
+// Dos cotizaciones inventadas (fijas, para que el HTML del servidor y el del navegador coincidan)
+const SERIE_A = [52, 55, 51, 58, 56, 61, 57, 63, 60, 66, 62, 64, 70, 67, 73, 69, 76, 72, 78, 75, 82, 79, 85, 83, 90];
+const SERIE_B = [38, 35, 39, 36, 42, 40, 37, 44, 41, 46, 43, 48, 45, 42, 49, 47, 52, 50, 55, 51, 57, 54, 59, 56, 61];
+
+function trazo(serie: number[], W: number, H: number) {
+  const paso = W / (serie.length - 1);
+  return serie.map((v, i) => `${i ? "L" : "M"}${(i * paso).toFixed(1)} ${(H - (v / 100) * H).toFixed(1)}`).join("");
+}
+
+function LoginBackdrop() {
+  const W = 1200, H = 400;
+  const a = trazo(SERIE_A, W, H), b = trazo(SERIE_B, W, H);
+  return (
+    <div className="login-bg" aria-hidden="true">
+      <div className="login-glow g1" />
+      <div className="login-glow g2" />
+      <div className="login-grid" />
+      <svg className="login-lines" viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="lbA" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" style={{ stopColor: "var(--up)", stopOpacity: 0.18 }} />
+            <stop offset="1" style={{ stopColor: "var(--up)", stopOpacity: 0 }} />
+          </linearGradient>
+        </defs>
+        <path d={`${a}L${W} ${H}L0 ${H}Z`} fill="url(#lbA)" />
+        <path d={a} fill="none" style={{ stroke: "var(--up)" }} strokeOpacity=".45" strokeWidth="2" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+        <path d={b} fill="none" style={{ stroke: "var(--brand2)" }} strokeOpacity=".35" strokeWidth="1.5" strokeDasharray="6 6" vectorEffect="non-scaling-stroke" strokeLinejoin="round" />
+      </svg>
+    </div>
   );
 }
