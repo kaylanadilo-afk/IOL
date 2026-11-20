@@ -1,6 +1,6 @@
 {
-  "name": "IOL Aula · Broker educativo",
-  "short_name": "IOL Aula",
+  "name": "Zeno Investments · Broker educativo",
+  "short_name": "Zeno",
   "description": "Simulador de broker: acciones, CEDEARs, bonos y dólar MEP con precios reales de BYMA.",
   "id": "/",
   "start_url": "/?app=pwa",

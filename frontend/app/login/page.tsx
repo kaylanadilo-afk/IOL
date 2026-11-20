@@ -77,9 +77,9 @@ export default function LoginPage() {
       <div className="login-main">
         <header className="login-brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="brand-mark" src="/icons/icon-192.png" alt="" />
+          <img className="brand-mark" src="/brand/zeno-mark.png" alt="" />
           <div>
-            <span className="wordmark">IOL <span>Aula</span></span>
+            <span className="wordmark">Zeno <span>Investments</span></span>
             <p>Broker educativo<span className="hide-sm"> · Mercado argentino</span></p>
           </div>
         </header>

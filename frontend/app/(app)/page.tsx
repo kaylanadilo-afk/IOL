@@ -67,8 +67,8 @@ export default function InicioPage() {
       <div className="home-head">
         <div className="brand">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img className="brand-mark" src="/icons/icon-192.png" alt="" />
-          <span className="wordmark">IOL <span>Aula</span></span>
+          <img className="brand-mark" src="/brand/zeno-mark.png" alt="" />
+          <span className="wordmark">Zeno <span>Investments</span></span>
         </div>
         <MercadoPill />
       </div>
@@ -84,8 +84,8 @@ export default function InicioPage() {
               </svg>
             </button>
           </div>
-          <div className="hero-num">{ocultar ? "$ ••••••" : pat != null ? <MontoHero n={pat} cur="ARS" /> : "—"}</div>
-          <div className="hero-sub">{ocultar ? "≈ US$ ••••" : pat != null && tc ? `≈ ${money(pat / tc, "USD").replace(/,\d+$/, "")} al dólar MEP de ${money(tc, "ARS")}` : ""}</div>
+          <div className="hero-num">{ocultar ? "$ ******" : pat != null ? <MontoHero n={pat} cur="ARS" /> : "—"}</div>
+          <div className="hero-sub">{ocultar ? "≈ US$ ******" : pat != null && tc ? `≈ ${money(pat / tc, "USD").replace(/,\d+$/, "")} al dólar MEP de ${money(tc, "ARS")}` : ""}</div>
         </div>
         <CashButton saldos={cart.saldos_disponibles} oculto={ocultar} />
       </section>
@@ -97,14 +97,14 @@ export default function InicioPage() {
           <div className="ctitle"><h2>Inversiones</h2><Link href="/cartera" className="btn btn-ghost btn-sm">Ver cartera</Link></div>
           {invertido > 0 ? (
             <div className="invest">
-              <DonutSvg parts={parts} centro={<><small>Invertido</small><b className="priv">{compacto(invertido, "ARS")}</b></>} />
+              <DonutSvg parts={parts} centro={<><small>Invertido</small><b>{ocultar ? "$ ****" : compacto(invertido, "ARS")}</b></>} />
               <div>
-                <div className="invest-figs priv">
+                <div className="invest-figs">
                   <div>
-                    <b>{money(cart.total_valorizado.ARS, "ARS")}</b>
-                    {cart.total_valorizado.USD > 0 && <> <span className="muted">y {money(cart.total_valorizado.USD, "USD")}</span></>}
+                    <b>{ocultar ? "$ ******" : money(cart.total_valorizado.ARS, "ARS")}</b>
+                    {cart.total_valorizado.USD > 0 && !ocultar && <> <span className="muted">y {money(cart.total_valorizado.USD, "USD")}</span></>}
                   </div>
-                  <div className={cls(res.ARS)} style={{ fontSize: 14 }}>{signed(res.ARS, "ARS")} ({pct(rendARS)}) sin realizar</div>
+                  <div className={cls(res.ARS)} style={{ fontSize: 14 }}>{ocultar ? pct(rendARS) : `${signed(res.ARS, "ARS")} (${pct(rendARS)})`} sin realizar</div>
                 </div>
                 <Legend parts={parts} />
               </div>

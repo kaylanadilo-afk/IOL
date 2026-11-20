@@ -120,7 +120,7 @@ export function CashButton({ saldos, oculto = false }: { saldos: Cartera["saldos
       onClick={() => { setCur(cur === "ARS" ? "USD" : "ARS"); setFlip((f) => f + 1); vibrar(6); }}
     >
       <small>Disponible para operar <span className="seg"><i className={cur === "ARS" ? "on" : ""}>ARS</i><i className={cur === "USD" ? "on" : ""}>USD</i></span></small>
-      <span key={flip} className={`amt${flip ? " flip" : ""}`}>{oculto ? `${cur === "USD" ? "US$" : "$"} ••••••` : money(saldos[cur], cur)}</span>
+      <span key={flip} className={`amt${flip ? " flip" : ""}`}>{oculto ? `${cur === "USD" ? "US$" : "$"} ******` : money(saldos[cur], cur)}</span>
     </button>
   );
 }
@@ -139,9 +139,9 @@ export function InstallBanner() {
   return (
     <div className="install-banner only-m">
       {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/icons/icon-192.png" alt="" />
+      <img src="/icons/icon-192.png" alt="" style={{ background: "#fff" }} />
       <div style={{ flex: 1 }}>
-        <b>Instalá IOL Aula</b>
+        <b>Instalá Zeno Investments</b>
         <div style={{ fontSize: 12.5, opacity: 0.85 }}>{puedeInstalar ? "Abrila como una app, a pantalla completa." : 'Tocá Compartir ⎋ y después "Agregar a inicio".'}</div>
       </div>
       {puedeInstalar && <button type="button" className="btn btn-sm" onClick={instalar}>Instalar</button>}

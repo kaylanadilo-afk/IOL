@@ -14,7 +14,7 @@ export default function RankingsPage() {
     () => Promise.all([api.masOperados(), api.masFavoritos(), api.ganancias(cuentaId)]),
     [cuentaId, reloadKey],
   );
-  const head = <Head title="Rankings del mercado" sub="Lo que se está operando en IOL Aula" />;
+  const head = <Head title="Rankings del mercado" sub="Lo que se está operando en Zeno Investments" />;
   if (error) return <>{head}<ErrorCard message={error} onRetry={reload} /></>;
   if (!data) return <>{head}<Loading /></>;
 

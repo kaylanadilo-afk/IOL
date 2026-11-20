@@ -44,7 +44,7 @@ a{color:var(--brand2)}
 body:not(.is-admin) .admin-only{display:none!important}
 
 /* ===================== MARCA ===================== */
-.brand-mark{width:36px;height:36px;border-radius:11px;display:block;flex:0 0 auto}
+.brand-mark{height:36px;width:auto;display:block;flex:0 0 auto;object-fit:contain}
 .wordmark{font-weight:700;font-size:19px;letter-spacing:-.03em;white-space:nowrap}
 .wordmark span{color:var(--muted);font-weight:500}
 
@@ -61,7 +61,7 @@ body:not(.is-admin) .admin-only{display:none!important}
 [data-theme="dark"] .login-glow{opacity:.8}
 .login-main{width:min(440px,100%);display:flex;flex-direction:column;align-items:center;gap:28px}
 .login-brand{display:flex;align-items:center;gap:16px}
-.login-brand .brand-mark{width:60px;height:60px;border-radius:17px;box-shadow:0 10px 30px rgba(10,143,92,.28)}
+.login-brand .brand-mark{height:62px;width:auto}
 .login-brand .wordmark{font-size:34px;line-height:1}
 .login-brand p{margin:7px 0 0;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 .login-card h1{margin-top:20px}
@@ -172,7 +172,7 @@ body:not(.menu-open) .sidebar [data-tip]:hover::after{content:attr(data-tip);pos
 .dolar-row span{text-align:right}
 .dolar-head{color:var(--muted);font-size:12px;border-bottom:0;padding-bottom:0}
 .home-head .brand{display:flex;align-items:center;gap:12px}
-.home-head .brand-mark{width:40px;height:40px;border-radius:12px}
+.home-head .brand-mark{height:40px;width:auto}
 .home-head .wordmark{font-size:22px}
 .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:12px;align-items:end;margin-bottom:12px}
 .hero-label{color:var(--muted);font-size:14px}
@@ -273,11 +273,7 @@ tbody tr:last-child td{border-bottom:0}
 .bar{height:6px;border-radius:3px;background:var(--brand2)}
 
 /* ===================== PERFIL ===================== */
-.pf-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:20px;align-items:center;margin-bottom:12px}
-.pf-gear{align-self:start;display:grid;place-items:center;width:42px;height:42px;border-radius:12px;border:1px solid var(--line);background:var(--card);color:var(--muted);transition:color .15s,border-color .15s,transform .3s}
-.pf-gear svg{width:21px;height:21px}
-.pf-gear:hover{color:var(--text);border-color:var(--accent)}
-.pf-gear:hover svg{transform:rotate(45deg);transition:transform .3s}
+.pf-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:20px;align-items:center;margin-bottom:12px}
 .back-link{display:inline-block;color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:500;margin-bottom:4px}
 .back-link:hover{color:var(--text)}
 .cfg-head h1{margin:0}
@@ -286,7 +282,6 @@ tbody tr:last-child td{border-bottom:0}
 .hide-btn{display:grid;place-items:center;width:30px;height:30px;border:0;border-radius:8px;background:transparent;color:var(--muted);cursor:pointer;padding:0}
 .hide-btn:hover{background:var(--card2);color:var(--text)}
 .hide-btn svg{width:19px;height:19px}
-.montos-ocultos .priv,.montos-ocultos .chart .ylab,.montos-ocultos .chart .tip{filter:blur(7px);user-select:none}
 .chart-var{font-size:15px;margin-top:2px}
 /* Mi cartera: tarjetas de resumen */
 .kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:12px}
@@ -363,8 +358,7 @@ tbody tr:last-child td{border-bottom:0}
 
 @media(max-width:1100px){.g4{grid-template-columns:repeat(2,minmax(0,1fr))}.g2,.g2e,.gtrade,.g3{grid-template-columns:minmax(0,1fr)}.main{padding:22px 20px 36px}
   .home-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pf-grid,.cols2{grid-template-columns:minmax(0,1fr)}.pf-hero{grid-template-columns:auto minmax(0,1fr)}.pf-stats{grid-column:1/-1}
-  .pf-hero{grid-template-columns:auto minmax(0,1fr) auto}.pf-gear{grid-row:1;grid-column:3}
-  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  .pf-hero{grid-template-columns:auto minmax(0,1fr) auto}  .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 /* ===================== CELULAR (estilo app, menú abajo) ===================== */
 @media(min-width:801px){.only-m{display:none!important}}
@@ -465,9 +459,10 @@ tbody tr:last-child td{border-bottom:0}
   .login-card{padding:24px 20px;border-radius:20px}
   .login{padding-bottom:calc(64px + env(safe-area-inset-bottom))}
   .login-main{gap:22px}
-  .login-brand .brand-mark{width:50px;height:50px;border-radius:15px}
+  .login-brand .brand-mark{height:50px;width:auto}
   .login-brand .wordmark{font-size:28px}
   .login-brand .hide-sm{display:none}
+  .home-head .brand{gap:8px}.home-head .brand-mark{height:32px}.home-head .wordmark{font-size:18.5px}
 }
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:560px){.g4{grid-template-columns:minmax(0,1fr)}.chart{height:230px}}

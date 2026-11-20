@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api, guardarToken, leerToken } from "@/lib/api";
+import { limpiarCache } from "@/lib/useAsync";
 import type { Activo, EstadoMercado, Inversor, Sesion } from "@/lib/types";
 
 type Estado = "cargando" | "anonimo" | "listo";
@@ -66,6 +67,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
 
   const salir = useCallback(() => {
     guardarToken(null);
+    limpiarCache();
     meRef.current = null;
     setMe(null);
     setEstado("anonimo");

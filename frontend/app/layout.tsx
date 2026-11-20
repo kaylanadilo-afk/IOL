@@ -11,10 +11,10 @@ const instrument = Instrument_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "IOL Aula | Broker educativo",
+  title: "Zeno Investments | Broker educativo",
   description: "Simulador de broker: acciones, CEDEARs, bonos y dólar MEP con precios reales.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, title: "IOL Aula", statusBarStyle: "black-translucent" },
+  appleWebApp: { capable: true, title: "Zeno", statusBarStyle: "black-translucent" },
   formatDetection: { telephone: false },
 };
 

@@ -105,7 +105,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     };
     const onInstalled = () => {
       setDeferred(null);
-      toast("¡Listo! IOL Aula quedó instalada.");
+      toast("¡Listo! Zeno Investments quedó instalada.");
     };
     window.addEventListener("beforeinstallprompt", onPrompt);
     window.addEventListener("appinstalled", onInstalled);

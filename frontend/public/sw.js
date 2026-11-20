@@ -1,8 +1,8 @@
-/* Service worker de IOL Aula.
+/* Service worker de Zeno Investments.
  * Guarda solo los íconos y el manifest para que la app instalada abra rápido.
  * Las páginas y los datos de la API (precios, saldos, operaciones) siempre van a la red.
  */
-const VERSION = 'iol-aula-next-v1';
+const VERSION = 'iol-aula-next-v2';
 const SHELL = ['/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png', '/icons/maskable-512.png'];
 
 self.addEventListener('install', (event) => {
