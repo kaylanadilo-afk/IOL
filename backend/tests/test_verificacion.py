@@ -14,7 +14,7 @@ def mails(monkeypatch):
     """Activa la verificación y guarda los correos en vez de mandarlos."""
     enviados = []
     monkeypatch.setenv("VERIFICAR_EMAIL", "1")
-    monkeypatch.setattr(correo, "enviar", lambda destino, asunto, texto, html: enviados.append((destino, texto)) or True)
+    monkeypatch.setattr(correo, "despachar", lambda destino, asunto, texto, html: enviados.append((destino, texto)))
     return enviados
 
 
@@ -60,6 +60,15 @@ def test_casilla_inexistente_se_rechaza(client, monkeypatch):
         mx = [(5, "gmail-smtp-in.l.google.com.")]
 
     monkeypatch.setattr(validaciones, "validate_email", lambda *a, **k: R())
-    monkeypatch.setattr(validaciones, "casilla_existe", lambda email, mx: False)
+    monkeypatch.setattr(validaciones, "consultar_casilla", lambda email, mx: False)
     r = client.post("/inversores", json={**ALTA, "email": "inventada@gmail.com"})
     assert r.status_code == 422 and "no existe" in r.json()["campos"]["email"]
+
+
+def test_la_consulta_al_servidor_de_correo_tiene_limite_de_tiempo(monkeypatch):
+    import time as t
+    monkeypatch.setattr(validaciones, "LIMITE_CONSULTA", 0.2)
+    monkeypatch.setattr(validaciones, "casilla_existe", lambda email, mx: t.sleep(2) or False)
+    inicio = t.monotonic()
+    assert validaciones.consultar_casilla("lento@ejemplo.com", ["mx.ejemplo.com"]) is None
+    assert t.monotonic() - inicio < 1

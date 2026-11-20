@@ -99,10 +99,7 @@ class InversorService:
         inv.codigo_intentos = 0
         self.db.commit()
         asunto, texto, html = correo.mail_codigo(inv.nombre.split(" ")[0], codigo, MINUTOS_CODIGO)
-        try:
-            correo.enviar(inv.email, asunto, texto, html)
-        except Exception as e:  # el código queda guardado: se puede pedir otro
-            raise BusinessError("No pudimos enviar el correo. Probá reenviar el código en un momento.") from e
+        correo.despachar(inv.email, asunto, texto, html)
 
     def reenviar_codigo(self, email: str) -> dict:
         inv = self.repo.find_by_email(email.strip().lower())

@@ -3,6 +3,9 @@ import os
 import re
 import secrets
 import smtplib
+import time
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as Demora
 
 from email_validator import EmailNotValidError, EmailUndeliverableError, validate_email
 
@@ -10,6 +13,13 @@ from email_validator import EmailNotValidError, EmailUndeliverableError, validat
 PREFIJOS_CUIT = {"20", "23", "24", "27", "30", "33", "34"}
 PESOS_CUIT = (5, 4, 3, 2, 7, 6, 5, 4, 3, 2)
 NOMBRE_RE = re.compile(r"^[A-Za-zÀ-ÖØ-öø-ÿ][A-Za-zÀ-ÖØ-öø-ÿ'´ .-]*$")
+
+# La consulta al servidor de correo es "si contesta rápido, mejor": nunca puede frenar el formulario
+LIMITE_CONSULTA = 4  # segundos en total
+_consultas = ThreadPoolExecutor(max_workers=4, thread_name_prefix="casilla")
+# Resultado de cada correo revisado (el formulario lo revisa al salir del campo y otra vez al crear la cuenta)
+_revisados: dict[str, tuple[float, str | None, str]] = {}
+DURACION_CACHE = 600
 
 
 def validar_dns() -> bool:
@@ -23,8 +33,25 @@ def validar_email(v: str) -> str:
     if not v:
         raise ValueError("Ingresá tu correo electrónico")
     dns = validar_dns()
+    if dns:
+        guardado = _revisados.get(v.lower())
+        if guardado and time.monotonic() - guardado[0] < DURACION_CACHE:
+            if guardado[1]:
+                raise ValueError(guardado[1])
+            return guardado[2]
+        try:
+            email = _validar_email(v, dns)
+        except ValueError as e:
+            _revisados[v.lower()] = (time.monotonic(), str(e), v)
+            raise
+        _revisados[v.lower()] = (time.monotonic(), None, email)
+        return email
+    return _validar_email(v, dns)
+
+
+def _validar_email(v: str, dns: bool) -> str:
     try:
-        r = validate_email(v, check_deliverability=dns, test_environment=not dns, timeout=5)
+        r = validate_email(v, check_deliverability=dns, test_environment=not dns, timeout=4)
     except EmailUndeliverableError as e:
         texto = str(e)
         if "does not exist" in texto:
@@ -37,9 +64,17 @@ def validar_email(v: str) -> str:
             raise ValueError("Ese dominio no se puede usar para correos. Usá una dirección real") from None
         raise ValueError("Ingresá un correo válido, por ejemplo nombre@gmail.com") from None
     email = r.normalized.lower()
-    if dns and casilla_existe(email, [mx for _, mx in (getattr(r, "mx", None) or [])]) is False:
+    if dns and consultar_casilla(email, [mx for _, mx in (getattr(r, "mx", None) or [])]) is False:
         raise ValueError("Esta casilla de correo no existe. Revisá que esté bien escrita")
     return email
+
+
+def consultar_casilla(email: str, mx: list[str]) -> bool | None:
+    """casilla_existe con un límite de tiempo total: si el servidor tarda, no se sabe (None)."""
+    try:
+        return _consultas.submit(casilla_existe, email, mx).result(timeout=LIMITE_CONSULTA)
+    except Demora:
+        return None
 
 
 def _rcpt(servidor: smtplib.SMTP, email: str) -> int:
@@ -57,7 +92,7 @@ def casilla_existe(email: str, mx: list[str]) -> bool | None:
         return None
     dominio = email.rsplit("@", 1)[1]
     try:
-        with smtplib.SMTP(mx[0].rstrip("."), 25, timeout=8, local_hostname="mail.zeno.investments") as s:
+        with smtplib.SMTP(mx[0].rstrip("."), 25, timeout=LIMITE_CONSULTA, local_hostname="mail.zeno.investments") as s:
             s.ehlo()
             if s.mail("")[0] != 250:
                 return None

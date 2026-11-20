@@ -14,6 +14,7 @@ import logging
 import os
 import smtplib
 import ssl
+import threading
 from email.message import EmailMessage
 from email.utils import formataddr, parseaddr
 
@@ -52,6 +53,18 @@ def enviar(destino: str, asunto: str, texto: str, html: str) -> bool:
                 s.login(usuario, clave)
             s.send_message(msg)
     return True
+
+
+def despachar(destino: str, asunto: str, texto: str, html: str) -> None:
+    """Manda el correo en segundo plano para que la pantalla no espere a Gmail (tarda unos segundos).
+    Si falla queda en el log de la API y la persona puede pedir otro código."""
+    def tarea():
+        try:
+            enviar(destino, asunto, texto, html)
+        except Exception:
+            log.exception("No se pudo enviar el correo a %s", destino)
+
+    threading.Thread(target=tarea, daemon=True, name="correo").start()
 
 
 def mail_codigo(nombre: str, codigo: str, minutos: int) -> tuple[str, str, str]:
