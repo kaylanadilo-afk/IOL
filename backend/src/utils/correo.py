@@ -30,7 +30,8 @@ def enviar(destino: str, asunto: str, texto: str, html: str) -> bool:
         log.warning("SMTP sin configurar: no se envió el correo a %s. Contenido:\n%s", destino, texto)
         return False
     host, port = os.environ["SMTP_HOST"], int(os.getenv("SMTP_PORT", "587"))
-    usuario, clave = os.getenv("SMTP_USER", ""), os.getenv("SMTP_PASSWORD", "")
+    # Google muestra la contraseña de aplicación en grupos ("abcd efgh ..."): los espacios no van
+    usuario, clave = os.getenv("SMTP_USER", "").strip(), os.getenv("SMTP_PASSWORD", "").replace(" ", "").strip("\"'")
     nombre, remitente = parseaddr(os.getenv("SMTP_FROM") or usuario)
     msg = EmailMessage()
     msg["Subject"] = asunto
