@@ -26,6 +26,8 @@ from src.repositories.broker_repository import ActivoRepository
 from src.services import precios_service
 from src.services.cuenta_service import CuentaService
 from src.services.inversor_service import InversorService
+from src.utils import limites
+from src.utils.feriados import es_feriado
 from src.utils.errors import AppError
 from src.utils.mercado import RIESGO_MAXIMO, TZ_AR, estado_mercado, get_ahora
 
@@ -37,7 +39,8 @@ def _url() -> str:
     return os.getenv("GROQ_URL", "").strip() or GROQ_URL
 MODELO_POR_DEFECTO = "openai/gpt-oss-120b"
 DURACION_INFORME = 15 * 60  # el informe del día se reutiliza 15 minutos (salvo que se pida actualizar)
-_informes: dict[int, tuple[float, dict]] = {}
+MAX_INFORMES = 500          # informes guardados en memoria (uno por cuenta)
+_informes: dict[int, tuple[float, dict]] = {}  # cuenta_id -> (momento, informe)
 
 DESCRIPCION_PERFIL = {
     "conservador": "prioriza cuidar el capital; solo puede comprar activos con riesgo hasta 2 (bonos y defensivos)",
@@ -123,14 +126,14 @@ def _dolares() -> dict:
 
 def _momento_precios(ahora: datetime, en_rueda: bool) -> str:
     """Cuándo valen los precios, dicho como lo diría un operador: 'hoy 15:30' o 'cierre del 26/11'.
-    Fuera de la rueda la cotización es la del último cierre (no se tienen en cuenta los feriados)."""
+    Fuera de la rueda la cotización es la del último cierre (salteando fines de semana y feriados)."""
     local = ahora.astimezone(TZ_AR)
     if en_rueda:
         return f"hoy {local:%H:%M}"
     dia = local.date()
     if local.weekday() < 5 and local.hour < 11:
         dia -= timedelta(days=1)  # antes de la apertura vale el cierre del día hábil anterior
-    while dia.weekday() >= 5:
+    while dia.weekday() >= 5 or es_feriado(dia):
         dia -= timedelta(days=1)
     return f"cierre del {dia:%d/%m}"
 
@@ -401,10 +404,18 @@ ESQUEMA = {
 
 def recomendacion(db: Session, token: str | None, actualizar: bool = False) -> dict:
     ctx = contexto(db, token)
-    inv_id = ctx["_cartera"]["cuenta_id"]
-    guardado = _informes.get(inv_id)
-    if guardado and not actualizar and time.monotonic() - guardado[0] < DURACION_INFORME:
+    # Con el contexto armado ya no hace falta la base: se libera la conexión antes de esperar a la IA
+    db.close()
+    cuenta_id = ctx["_cartera"]["cuenta_id"]
+    guardado = _informes.get(cuenta_id)
+    vigente = guardado and time.monotonic() - guardado[0] < DURACION_INFORME
+    if vigente and not actualizar:
         return guardado[1]
+    if actualizar and guardado:
+        # Pedir un informe nuevo gasta la cuota compartida de Groq: uno cada 2 minutos por cuenta
+        if limites.INFORME_IA.espera(str(cuenta_id)) > 0:
+            return guardado[1]
+        limites.INFORME_IA.registrar(str(cuenta_id))
     pedido = ("Analizá mi situación y el mercado de hoy y armá el informe del día: entre 3 y 5 recomendaciones "
               "concretas con montos realistas, respetando mi situacion_cuenta, 2 a 4 riesgos a vigilar y 2 o 3 próximos "
               f"pasos. Contexto:\n{_para_modelo(ctx)}")
@@ -417,7 +428,9 @@ def recomendacion(db: Session, token: str | None, actualizar: bool = False) -> d
     except (KeyError, IndexError, ValueError) as e:
         raise AppError("La IA devolvió una respuesta que no se pudo leer. Probá de nuevo.", 502) from e
     informe = _ajustar(datos, ctx)
-    _informes[inv_id] = (time.monotonic(), informe)
+    if len(_informes) >= MAX_INFORMES:  # se descarta el más viejo para que la memoria no crezca sin fin
+        _informes.pop(min(_informes, key=lambda k: _informes[k][0]), None)
+    _informes[cuenta_id] = (time.monotonic(), informe)
     return informe
 
 
@@ -472,7 +485,7 @@ def _ajustar(datos: dict, ctx: dict) -> dict:
         "descartadas": descartadas,
         "situacion": ctx["situacion_cuenta"],
         "perfil": ctx["inversor"]["perfil_riesgo"],
-        "generado": datetime.now().isoformat(timespec="seconds"),
+        "generado": datetime.now(TZ_AR).isoformat(timespec="seconds"),
         "modelo": modelo(),
         "fuentes": _fuentes(ctx),
     }
@@ -515,6 +528,7 @@ def chat(db: Session, token: str | None, mensajes: list[dict]) -> Iterator[str]:
                  if m.get("role") in ("user", "assistant") and m.get("content")]
     # Los activos que el inversor nombra en las últimas preguntas se suman a la tabla del contexto
     ctx = contexto(db, token, [m["content"] for m in historial if m["role"] == "user"][-3:])
+    db.close()  # el contexto ya está armado: la conexión vuelve al pool mientras dura la respuesta de la IA
     sistema = (SISTEMA + "\n\nRespondé en pocos párrafos cortos (máximo 180 palabras), con viñetas si ayuda. "
                "Usá **negrita** para tickers y cifras clave. Contexto actual del inversor y del mercado:\n" + _para_modelo(ctx))
 

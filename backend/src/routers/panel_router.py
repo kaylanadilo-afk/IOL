@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
+from src.utils.autorizacion import cuenta_autorizada, inversor_autorizado, solo_admin
 from src.dtos.broker_dto import ActivoDTO, DividendoDTO, InversorDTO, MovimientoDTO, OperacionDTO
 from src.mappers.broker_mapper import to_json
 from src.schemas.broker_schema import CreateDividendoSchema, CreateInversorSchema
@@ -15,7 +16,6 @@ from src.services.cuenta_service import CuentaService
 from src.services.inversor_service import InversorService
 from src.services.operacion_service import OperacionService
 from src.services.registros_service import RegistrosService
-from src.utils.autorizacion import solo_admin
 from src.utils.mercado import estado_mercado, get_ahora
 
 router = APIRouter(prefix="/panel", tags=["Panel de inversiones"])
@@ -27,7 +27,7 @@ def mercado(ahora: datetime = Depends(get_ahora)):
 
 
 @router.get("/inversores/{inversor_id}", response_model=InversorDTO, summary="Inversor con su cuenta comitente")
-def perfil(inversor_id: int, db: Session = Depends(get_db)):
+def perfil(inversor_id: int, db: Session = Depends(get_db), _yo=Depends(inversor_autorizado)):
     return InversorService(db).obtener(inversor_id)
 
 
@@ -50,12 +50,12 @@ def activos(db: Session = Depends(get_db)):
 
 
 @router.get("/cuentas/{cuenta_id}/cartera")
-def cartera(cuenta_id: int, db: Session = Depends(get_db)):
+def cartera(cuenta_id: int, db: Session = Depends(get_db), _yo=Depends(cuenta_autorizada)):
     return CuentaService(db).cartera(cuenta_id)
 
 
 @router.get("/cuentas/{cuenta_id}/actividad", summary="Movimientos de dinero y operaciones de la cuenta")
-def actividad(cuenta_id: int, db: Session = Depends(get_db)):
+def actividad(cuenta_id: int, db: Session = Depends(get_db), _yo=Depends(cuenta_autorizada)):
     return to_json({
         "movimientos": CuentaService(db).movimientos(cuenta_id),
         "operaciones": OperacionService(db).historial(cuenta_id, None, None, None, None),
@@ -63,20 +63,20 @@ def actividad(cuenta_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/cuentas/{cuenta_id}/movimientos", response_model=MovimientoDTO, status_code=status.HTTP_201_CREATED)
-def transferir(cuenta_id: int, payload: TransferenciaPanelSchema, db: Session = Depends(get_db)):
+def transferir(cuenta_id: int, payload: TransferenciaPanelSchema, db: Session = Depends(get_db), _yo=Depends(cuenta_autorizada)):
     return RegistrosService(db).crear_movimiento(cuenta_id, payload.tipo, payload.moneda, payload.monto)
 
 
 @router.post("/cuentas/{cuenta_id}/operaciones", response_model=OperacionDTO, status_code=status.HTTP_201_CREATED)
 def operar(cuenta_id: int, payload: OrdenPanelSchema, db: Session = Depends(get_db),
-           ahora: datetime = Depends(get_ahora)):
+           ahora: datetime = Depends(get_ahora), _yo=Depends(cuenta_autorizada)):
     return RegistrosService(db).crear_operacion(cuenta_id, payload.tipo, payload.cantidad, ahora,
                                                 payload.activo_id, payload.ticker)
 
 
 @router.post("/dividendos", response_model=DividendoDTO, status_code=status.HTTP_201_CREATED,
              summary="Pagar un dividendo (igual que POST /dividendos)")
-def pagar_dividendo(payload: CreateDividendoSchema, db: Session = Depends(get_db)):
+def pagar_dividendo(payload: CreateDividendoSchema, db: Session = Depends(get_db), _admin=Depends(solo_admin)):
     return ActivoService(db).registrar_dividendo(payload.activo_id, payload.monto_por_unidad, payload.fecha_pago)
 
 

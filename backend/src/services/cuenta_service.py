@@ -73,8 +73,12 @@ class CuentaService:
                 "valor_actual": valor, "resultado": q2(valor - costo), "rendimiento_pct": rendimiento,
             })
             por_moneda[a.moneda] += valor
-            # Para sumar pesos y dólares en la composición se pasan los USD a ARS al tipo de cambio MEP
-            por_tipo[a.tipo] += valor * (tc if a.moneda == "USD" and tc else 1)
+            # Para sumar pesos y dólares en la composición se pasan los USD a ARS al tipo de cambio MEP.
+            # Sin tipo de cambio, los dólares quedan afuera (sumarlos como pesos daría porcentajes falsos)
+            if a.moneda == "ARS":
+                por_tipo[a.tipo] += valor
+            elif tc:
+                por_tipo[a.tipo] += valor * tc
 
         total_tipos = sum(por_tipo.values())
         composicion = [
@@ -91,6 +95,7 @@ class CuentaService:
             "saldos_disponibles": {"ARS": cuenta.saldo_ars, "USD": cuenta.saldo_usd},
             "composicion_por_tipo": composicion,
             "tipo_cambio_mep": tc,
+            "composicion_sin_dolares": tc is None and por_moneda["USD"] > 0,
             "patrimonio_total_ars": patrimonio,
         })
 

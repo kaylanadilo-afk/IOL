@@ -55,12 +55,14 @@ def enviar(destino: str, asunto: str, texto: str, html: str) -> bool:
     return True
 
 
-def despachar(destino: str, asunto: str, texto: str, html: str) -> None:
+def despachar(destino: str, asunto: str, texto: str, html: str, al_enviar=None) -> None:
     """Manda el correo en segundo plano para que la pantalla no espere a Gmail (tarda unos segundos).
-    Si falla queda en el log de la API y la persona puede pedir otro código."""
+    Si falla queda en el log de la API y la persona puede pedir otro código. `al_enviar` se llama solo si
+    el correo salió de verdad (sin SMTP configurado no sale)."""
     def tarea():
         try:
-            enviar(destino, asunto, texto, html)
+            if enviar(destino, asunto, texto, html) and al_enviar:
+                al_enviar()
         except Exception:
             log.exception("No se pudo enviar el correo a %s", destino)
 
@@ -106,3 +108,33 @@ def mail_alerta(nombre: str, titulo: str, mensaje: str, ticker: str, nombre_acti
 <tr><td style="padding:12px 28px 26px;font-size:12px;color:#667085;line-height:1.5">{aviso} Revisá la información antes de operar.</td></tr>
 </table></td></tr></table></body></html>"""
     return titulo, texto, html
+
+
+def _plantilla(nombre: str, intro: str, codigo: str | None, pie: str) -> str:
+    bloque = (f'<tr><td align="center" style="padding:22px 28px"><div style="display:inline-block;font-size:34px;font-weight:bold;'
+              f'letter-spacing:10px;background:#EEF1EC;border-radius:12px;padding:14px 22px">{codigo}</div></td></tr>') if codigo else ""
+    return f"""<!doctype html><html><body style="margin:0;background:#F4F6F3;font-family:Arial,Helvetica,sans-serif;color:#0E1A2B">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:460px;background:#fff;border:1px solid #E2E6E0;border-radius:16px">
+<tr><td style="padding:28px 28px 8px"><b style="font-size:20px">Zeno</b> <span style="font-size:20px;color:#667085">Investments</span></td></tr>
+<tr><td style="padding:8px 28px {'0' if codigo else '16px'};font-size:15px;line-height:1.5">Hola {nombre}: {intro}</td></tr>
+{bloque}
+<tr><td style="padding:0 28px 28px;font-size:13px;color:#667085;line-height:1.5">{pie}</td></tr>
+</table></td></tr></table></body></html>"""
+
+
+def mail_cambio_password(nombre: str, codigo: str, minutos: int) -> tuple[str, str, str]:
+    """Código para confirmar un cambio de contraseña."""
+    asunto = f"{codigo} es tu código para cambiar la contraseña de Zeno Investments"
+    pie = (f"Vence en {minutos} minutos. Si no pediste cambiar la contraseña, ignorá este mensaje: "
+           "tu contraseña sigue siendo la misma. Te recomendamos cambiarla si creés que alguien más la conoce.")
+    texto = f"Hola {nombre}:\n\nTu código para cambiar la contraseña es {codigo}.\n\n{pie}"
+    return asunto, texto, _plantilla(nombre, "usá este código para confirmar el cambio de tu contraseña.", codigo, pie)
+
+
+def mail_password_cambiada(nombre: str) -> tuple[str, str, str]:
+    """Aviso de que la contraseña se cambió (para enterarse si no fue uno)."""
+    asunto = "Tu contraseña de Zeno Investments cambió"
+    pie = "Si no fuiste vos, escribinos enseguida: alguien puede tener acceso a tu correo."
+    texto = f"Hola {nombre}:\n\nLa contraseña de tu cuenta se cambió recién y se cerraron las otras sesiones.\n\n{pie}"
+    return asunto, texto, _plantilla(nombre, "la contraseña de tu cuenta se cambió recién y se cerraron las otras sesiones abiertas.", None, pie)

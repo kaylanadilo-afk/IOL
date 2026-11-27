@@ -1,7 +1,7 @@
 """Alta, consulta, edición y baja de cada tabla (los endpoints que trae el backend InitialStructure).
 
-Consultar es libre, igual que el resto de la API. Editar y borrar es solo para administradores
-(header Authorization: Bearer <token de un administrador>): son correcciones manuales que no recalculan saldos.
+Todo pide sesión (header Authorization: Bearer <token>). Consultar y operar se puede solo sobre la propia cuenta.
+Editar y borrar es solo para administradores: son correcciones manuales que no recalculan saldos.
 """
 from datetime import datetime
 
@@ -16,7 +16,8 @@ from src.schemas.registros_schema import (CreateCuentaSchema, CreateMovimientoSc
                                           UpdateDividendoSchema, UpdateInversorSchema, UpdateMovimientoSchema,
                                           UpdateOperacionSchema, UpdateTenenciaSchema)
 from src.services.registros_service import RegistrosService
-from src.utils.autorizacion import solo_admin
+from src.utils.autorizacion import (cuenta_autorizada, inversor_autorizado, solo_admin, usuario_actual, verificar_cuenta,
+                                    verificar_inversor)
 from src.utils.mercado import get_ahora
 
 ADMIN = "Registros (admin)"
@@ -60,8 +61,9 @@ activos = APIRouter(prefix="/activos", tags=[ADMIN])
 
 
 @activos.put("/{activo_id}", response_model=ActivoDTO)
-def editar_activo(activo_id: int, payload: UpdateActivoSchema, db: Session = Depends(get_db), _=Depends(solo_admin)):
-    return RegistrosService(db).actualizar_activo(activo_id, payload.model_dump(exclude_unset=True))
+def editar_activo(activo_id: int, payload: UpdateActivoSchema, db: Session = Depends(get_db), _=Depends(solo_admin),
+                  ahora: datetime = Depends(get_ahora)):
+    return RegistrosService(db).actualizar_activo(activo_id, payload.model_dump(exclude_unset=True), ahora)
 
 
 @activos.delete("/{activo_id}", **SIN_CONTENIDO, summary="Borrar un activo que nunca se operó")
@@ -76,14 +78,17 @@ operaciones = APIRouter(prefix="/operaciones", tags=["Operaciones"])
 @operaciones.post("", response_model=OperacionDTO, status_code=status.HTTP_201_CREATED,
                   summary="Compra o venta (mismas reglas que /cuentas/{id}/compras y /ventas)")
 def crear_operacion(payload: CreateOperacionSchema, db: Session = Depends(get_db),
-                    ahora: datetime = Depends(get_ahora)):
+                    ahora: datetime = Depends(get_ahora), yo: InversorDTO = Depends(usuario_actual)):
+    verificar_cuenta(db, payload.cuenta_id, yo)
     return RegistrosService(db).crear_operacion(payload.cuenta_id, payload.tipo, payload.cantidad, ahora,
                                                 payload.activo_id, payload.ticker)
 
 
 @operaciones.get("/{operacion_id}", response_model=OperacionDTO)
-def ver_operacion(operacion_id: int, db: Session = Depends(get_db)):
-    return RegistrosService(db).obtener_operacion(operacion_id)
+def ver_operacion(operacion_id: int, db: Session = Depends(get_db), yo: InversorDTO = Depends(usuario_actual)):
+    op = RegistrosService(db).obtener_operacion(operacion_id)
+    verificar_cuenta(db, op.cuenta_id, yo)
+    return op
 
 
 @operaciones.put("/{operacion_id}", response_model=OperacionDTO, tags=[ADMIN], summary="Cambiar el estado")
@@ -103,13 +108,17 @@ movimientos = APIRouter(prefix="/movimientos", tags=["Cuentas"])
 
 @movimientos.post("", response_model=MovimientoDTO, status_code=status.HTTP_201_CREATED,
                   summary="Depósito o extracción (mismas reglas que /cuentas/{id}/depositos y /extracciones)")
-def crear_movimiento(payload: CreateMovimientoSchema, db: Session = Depends(get_db)):
+def crear_movimiento(payload: CreateMovimientoSchema, db: Session = Depends(get_db),
+                     yo: InversorDTO = Depends(usuario_actual)):
+    verificar_cuenta(db, payload.cuenta_id, yo)
     return RegistrosService(db).crear_movimiento(payload.cuenta_id, payload.tipo, payload.moneda, payload.monto)
 
 
 @movimientos.get("/{movimiento_id}", response_model=MovimientoDTO)
-def ver_movimiento(movimiento_id: int, db: Session = Depends(get_db)):
-    return RegistrosService(db).obtener_movimiento(movimiento_id)
+def ver_movimiento(movimiento_id: int, db: Session = Depends(get_db), yo: InversorDTO = Depends(usuario_actual)):
+    mov = RegistrosService(db).obtener_movimiento(movimiento_id)
+    verificar_cuenta(db, mov.cuenta_id, yo)
+    return mov
 
 
 @movimientos.put("/{movimiento_id}", response_model=MovimientoDTO, tags=[ADMIN], summary="Cambiar la descripción")
@@ -134,7 +143,7 @@ def crear_tenencia(payload: CreateTenenciaSchema, db: Session = Depends(get_db),
 
 
 @tenencias.get("/{cuenta_id}/{activo_id}", response_model=TenenciaDTO)
-def ver_tenencia(cuenta_id: int, activo_id: int, db: Session = Depends(get_db)):
+def ver_tenencia(cuenta_id: int, activo_id: int, db: Session = Depends(get_db), _yo=Depends(cuenta_autorizada)):
     return RegistrosService(db).obtener_tenencia(cuenta_id, activo_id)
 
 
@@ -175,17 +184,18 @@ favoritos = APIRouter(prefix="/favoritos", tags=["Favoritos"])
 
 
 @favoritos.post("", response_model=FavoritoDTO, status_code=status.HTTP_201_CREATED)
-def crear_favorito(payload: FavoritoSchema, db: Session = Depends(get_db)):
+def crear_favorito(payload: FavoritoSchema, db: Session = Depends(get_db), yo: InversorDTO = Depends(usuario_actual)):
+    verificar_inversor(payload.inversor_id, yo)
     return RegistrosService(db).crear_favorito(payload.inversor_id, payload.activo_id)
 
 
 @favoritos.get("/{inversor_id}/{activo_id}", response_model=FavoritoDTO)
-def ver_favorito(inversor_id: int, activo_id: int, db: Session = Depends(get_db)):
+def ver_favorito(inversor_id: int, activo_id: int, db: Session = Depends(get_db), _yo=Depends(inversor_autorizado)):
     return RegistrosService(db).obtener_favorito(inversor_id, activo_id)
 
 
 @favoritos.delete("/{inversor_id}/{activo_id}", **SIN_CONTENIDO)
-def borrar_favorito(inversor_id: int, activo_id: int, db: Session = Depends(get_db)):
+def borrar_favorito(inversor_id: int, activo_id: int, db: Session = Depends(get_db), _yo=Depends(inversor_autorizado)):
     RegistrosService(db).borrar_favorito(inversor_id, activo_id)
 
 

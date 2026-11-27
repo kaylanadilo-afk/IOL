@@ -60,7 +60,7 @@ def test_sincronizar_actualiza_catalogo_sin_tocar_operaciones(client, red_falsa)
     depositar(client, c, 100000)
     client.post(f"/cuentas/{c}/compras", json={"ticker": "GGAL", "cantidad": 10})
 
-    r = client.post("/mercado/sincronizar")
+    r = client.post("/mercado/sincronizar", headers=client.admin)
     assert r.status_code == 200, r.text
     # YPFD no estaba: cotiza en el panel de acciones, así que se suma al catálogo con su precio real
     assert r.json()["actualizados"] == 4 and r.json()["sin_dato"] == ["INVENTADO"]
@@ -84,7 +84,7 @@ def test_si_la_fuente_falla_quedan_los_ultimos_precios(client, monkeypatch):
         raise httpx.ConnectError("sin conexión")
 
     monkeypatch.setattr(precios, "obtener_cotizaciones", caida)
-    r = client.post("/mercado/sincronizar")
+    r = client.post("/mercado/sincronizar", headers=client.admin)
     assert r.status_code == 502 and "precios reales" in r.json()["detail"]
     assert client.get("/activos").json()[0]["precio_actual"] == 1000
     assert "ConnectError" in client.get("/mercado/estado").json()["precios"]["error"]

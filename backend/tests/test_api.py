@@ -69,7 +69,7 @@ def test_catalogo_y_filtros(client):
     nuevo_activo(client, "AAPL", tipo="cedear")
     nuevo_activo(client, "GD30", tipo="bono", moneda="USD", precio=0.9)
     assert client.post("/activos", json={"ticker": "ggal", "nombre": "Ana Test", "tipo": "accion", "moneda": "ARS",
-                                         "precio_actual": 1, "nivel_riesgo": 1}).status_code == 409
+                                         "precio_actual": 1, "nivel_riesgo": 1}, headers=client.admin).status_code == 409
     assert [a["ticker"] for a in client.get("/activos?tipo=cedear").json()] == ["AAPL"]
     assert [a["ticker"] for a in client.get("/activos?moneda=USD").json()] == ["GD30"]
     assert [a["ticker"] for a in client.get("/activos?tipo=bono&moneda=ARS").json()] == []
@@ -80,7 +80,7 @@ def test_catalogo_y_filtros(client):
 def test_activo_validaciones(client, campo, valor):
     datos = {"ticker": "X", "nombre": "Ana Test", "tipo": "accion", "moneda": "ARS", "precio_actual": 10, "nivel_riesgo": 3}
     datos[campo] = valor
-    assert client.post("/activos", json=datos).status_code == 422
+    assert client.post("/activos", json=datos, headers=client.admin).status_code == 422
 
 
 # ---------- HU3 ----------
@@ -112,7 +112,7 @@ def test_compra_descuenta_total_con_comision_y_promedia(client):
     assert r.status_code == 201, r.text
     op = r.json()
     assert op["comision"] == 50 and op["total"] == 10050 and op["precio_unitario"] == 1000
-    client.patch(f"/activos/{a['id']}/precio", json={"precio": 1300})
+    client.patch(f"/activos/{a['id']}/precio", json={"precio": 1300}, headers=client.admin)
     client.post(f"/cuentas/{c}/compras", json={"ticker": "GGAL", "cantidad": 20})
     ten = client.get(f"/cuentas/{c}/cartera").json()["tenencias"][0]
     assert ten["cantidad"] == 30 and ten["precio_promedio"] == 1200  # (10*1000+20*1300)/30
@@ -194,7 +194,7 @@ def test_venta_acredita_neto_y_guarda_ganancia(client):
     a = nuevo_activo(client, "GGAL", precio=1000)
     depositar(client, c, 20000)
     client.post(f"/cuentas/{c}/compras", json={"ticker": "GGAL", "cantidad": 10})  # paga 10050
-    client.patch(f"/activos/{a['id']}/precio", json={"precio": 1200})
+    client.patch(f"/activos/{a['id']}/precio", json={"precio": 1200}, headers=client.admin)
     r = client.post(f"/cuentas/{c}/ventas", json={"ticker": "GGAL", "cantidad": 4})
     op = r.json()
     assert r.status_code == 201
@@ -243,7 +243,7 @@ def test_mep_registra_dos_operaciones(client):
 
 def test_mep_si_falla_una_pata_no_se_guarda_ninguna(client):
     c, _, al30d = _setup_mep(client)
-    client.patch(f"/activos/{al30d['id']}/estado", json={"activo": False})  # la venta va a fallar
+    client.patch(f"/activos/{al30d['id']}/estado", json={"activo": False}, headers=client.admin)  # la venta va a fallar
     r = client.post(f"/cuentas/{c}/mep", json={"monto_ars": 100000})
     assert r.status_code == 422 and "AL30D" in r.json()["detail"]
     assert client.get(f"/cuentas/{c}").json()["saldo_ars"] == 1000000
@@ -263,10 +263,10 @@ def test_precio_y_suspension(client):
     a = nuevo_activo(client, "GGAL", precio=100)
     depositar(client, c, 10000)
     client.post(f"/cuentas/{c}/compras", json={"ticker": "GGAL", "cantidad": 2})
-    assert client.patch(f"/activos/{a['id']}/precio", json={"precio": 0}).status_code == 422
-    assert client.patch(f"/activos/{a['id']}/precio", json={"precio": 150}).json()["precio_actual"] == 150
+    assert client.patch(f"/activos/{a['id']}/precio", json={"precio": 0}, headers=client.admin).status_code == 422
+    assert client.patch(f"/activos/{a['id']}/precio", json={"precio": 150}, headers=client.admin).json()["precio_actual"] == 150
     assert client.get(f"/cuentas/{c}/operaciones").json()["operaciones"][0]["precio_unitario"] == 100
-    client.patch(f"/activos/{a['id']}/estado", json={"activo": False})
+    client.patch(f"/activos/{a['id']}/estado", json={"activo": False}, headers=client.admin)
     for accion in ("compras", "ventas"):
         r = client.post(f"/cuentas/{c}/{accion}", json={"ticker": "GGAL", "cantidad": 1})
         assert r.status_code == 422 and "suspendido" in r.json()["detail"]
@@ -275,27 +275,29 @@ def test_precio_y_suspension(client):
 # ---------- HU9 ----------
 def test_dividendo_acredita_a_cada_tenedor(client):
     a = nuevo_activo(client, "KO", tipo="cedear", precio=100)
-    cuentas = []
+    cuentas, sesiones = [], []
     for cant in (10, 25):
-        c = nuevo_inversor(client)["cuenta"]["id"]
+        inv = nuevo_inversor(client)
+        c = inv["cuenta"]["id"]
         depositar(client, c, 10000)
         client.post(f"/cuentas/{c}/compras", json={"ticker": "KO", "cantidad": cant})
         cuentas.append(c)
+        sesiones.append(inv["headers"])
     sin_tenencia = nuevo_inversor(client)["cuenta"]["id"]
-    saldos = [client.get(f"/cuentas/{c}").json()["saldo_ars"] for c in cuentas]
-    r = client.post("/dividendos", json={"activo_id": a["id"], "monto_por_unidad": 2.5})
+    saldos = [client.get(f"/cuentas/{c}", headers=h).json()["saldo_ars"] for c, h in zip(cuentas, sesiones)]
+    r = client.post("/dividendos", json={"activo_id": a["id"], "monto_por_unidad": 2.5}, headers=client.admin)
     assert r.status_code == 201
     assert r.json()["cuentas_acreditadas"] == 2 and r.json()["total_pagado"] == 87.5
-    for c, cant, antes in zip(cuentas, (10, 25), saldos):
-        assert client.get(f"/cuentas/{c}").json()["saldo_ars"] == pytest.approx(antes + cant * 2.5)
-        mov = client.get(f"/cuentas/{c}/movimientos").json()[0]
+    for c, cant, antes, h in zip(cuentas, (10, 25), saldos, sesiones):
+        assert client.get(f"/cuentas/{c}", headers=h).json()["saldo_ars"] == pytest.approx(antes + cant * 2.5)
+        mov = client.get(f"/cuentas/{c}/movimientos", headers=h).json()[0]
         assert mov["tipo"] == "dividendo" and mov["monto"] == cant * 2.5
     assert client.get(f"/cuentas/{sin_tenencia}/movimientos").json() == []
 
 
 def test_bonos_no_pagan_dividendos(client):
     a = nuevo_activo(client, "AL30", tipo="bono")
-    r = client.post("/dividendos", json={"activo_id": a["id"], "monto_por_unidad": 1})
+    r = client.post("/dividendos", json={"activo_id": a["id"], "monto_por_unidad": 1}, headers=client.admin)
     assert r.status_code == 422
 
 
@@ -311,7 +313,7 @@ def test_cartera_valorizada(client):
     client.post(f"/cuentas/{c}/compras", json={"ticker": "GGAL", "cantidad": 10})
     client.post(f"/cuentas/{c}/compras", json={"ticker": "AAPL", "cantidad": 20})
     client.post(f"/cuentas/{c}/compras", json={"ticker": "AL30D", "cantidad": 20})
-    client.patch(f"/activos/{g['id']}/precio", json={"precio": 1100})
+    client.patch(f"/activos/{g['id']}/precio", json={"precio": 1100}, headers=client.admin)
     cart = client.get(f"/cuentas/{c}/cartera").json()
     ggal = next(t for t in cart["tenencias"] if t["ticker"] == "GGAL")
     assert ggal["valor_actual"] == 11000 and ggal["rendimiento_pct"] == 10
@@ -357,11 +359,11 @@ def test_rankings(client, reloj):
     assert [r["ticker"] for r in client.get("/activos/mas-operados").json()] == ["B", "A"]
 
     otro = nuevo_inversor(client)
-    for i, t in ((inv["id"], "A"), (otro["id"], "A"), (otro["id"], "C")):
-        assert client.post(f"/inversores/{i}/favoritos/{activos[t]['id']}").status_code == 200
+    for quien, t in ((inv, "A"), (otro, "A"), (otro, "C")):
+        assert client.post(f"/inversores/{quien['id']}/favoritos/{activos[t]['id']}", headers=quien["headers"]).status_code == 200
     fav = client.get("/activos/mas-favoritos").json()
     assert [(f["ticker"], f["favoritos"]) for f in fav] == [("A", 2), ("C", 1)]
-    client.delete(f"/inversores/{otro['id']}/favoritos/{activos['A']['id']}")
+    client.delete(f"/inversores/{otro['id']}/favoritos/{activos['A']['id']}", headers=otro["headers"])
     assert client.get("/activos/mas-favoritos").json()[0]["favoritos"] == 1
 
 
@@ -371,19 +373,22 @@ def test_ganancias_realizadas_por_anio(client, reloj):
     depositar(client, c, 100000)
     reloj.ahora = datetime(2025, 3, 3, 12, tzinfo=sv.TZ_AR)
     client.post(f"/cuentas/{c}/compras", json={"ticker": "GGAL", "cantidad": 100})
-    client.patch(f"/activos/{a['id']}/precio", json={"precio": 200})
+    client.patch(f"/activos/{a['id']}/precio", json={"precio": 200}, headers=client.admin)
     client.post(f"/cuentas/{c}/ventas", json={"ticker": "GGAL", "cantidad": 50})  # 50*100 - 50 = 4950
     reloj.ahora = EN_HORARIO
-    client.patch(f"/activos/{a['id']}/precio", json={"precio": 80})
+    client.patch(f"/activos/{a['id']}/precio", json={"precio": 80}, headers=client.admin)
     client.post(f"/cuentas/{c}/ventas", json={"ticker": "GGAL", "cantidad": 50})  # -50*20 - 20 = -1020
     r = client.get(f"/cuentas/{c}/ganancias-realizadas").json()
     assert [(x["anio"], x["ARS"]) for x in r["por_anio"]] == [(2026, -1020), (2025, 4950)]
 
 
 def test_404(client):
+    nuevo_inversor(client)
     assert client.get("/cuentas/999/cartera").status_code == 404
     assert client.get("/activos/999").status_code == 404
-    assert client.patch("/inversores/999/perfil", json={"perfil_riesgo": "moderado", "password": "clave-segura"}).status_code == 404
+    # Otro inversor (aunque no exista) no se puede tocar; un administrador sí recibe el 404
+    assert client.patch("/inversores/999/perfil", json={"perfil_riesgo": "moderado"}).status_code == 403
+    assert client.patch("/inversores/999/perfil", json={"perfil_riesgo": "moderado"}, headers=client.admin).status_code == 404
 
 
 def test_validar_email_para_el_formulario(client):

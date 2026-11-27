@@ -6,7 +6,7 @@ import { useEffect, useRef } from "react";
 import { iniciales } from "@/lib/format";
 import { useSession } from "@/context/SessionContext";
 import { useUI } from "@/context/UIContext";
-import { textoMercado } from "./ui";
+import { estadoMercado } from "./ui";
 import {
   IcoAdmin, IcoAgente, IcoAlerta, IcoCartera, IcoClave, IcoComprar, IcoIngresar, IcoInicio, IcoLuna, IcoMep, IcoMercado,
   IcoOperaciones, IcoPerfil, IcoRetirar, IcoSalir, IcoVender, TabCartera, TabInicio, TabMas, TabMercado,
@@ -99,9 +99,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         </nav>
         <div className="side-bottom">
-          <div className="nav-item side-mkt" data-tip="Horario: lunes a viernes de 11 a 17">
-            <span className="mkt-dot"><span className={`dot${mercado?.abierto ? " on" : ""}`} /></span>
-            <span className="lbl">{textoMercado(mercado)}</span>
+          <div className="nav-item side-mkt" data-tip={`${estadoMercado(mercado).texto}: ${estadoMercado(mercado).ayuda}`}
+            aria-label={estadoMercado(mercado).ayuda}>
+            <span className="mkt-dot"><span className={`dot ${estadoMercado(mercado).clase}`} /></span>
+            <span className="lbl">{estadoMercado(mercado).texto}</span>
           </div>
           <div className="pp-wrap">
             <Link href="/perfil" className={`nav-item side-profile${actual === "/perfil" ? " active" : ""}`} aria-haspopup="true" aria-label="Mi perfil">

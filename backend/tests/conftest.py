@@ -22,6 +22,7 @@ from src.utils import mercado as sv
 import src.db.models  # noqa: F401
 from src.db.connection import Base, get_db
 from src.app import app
+from src.services.inversor_service import InversorService
 from src.utils.mercado import get_ahora
 
 URL = os.getenv("TEST_DATABASE_URL", "sqlite://")
@@ -41,6 +42,12 @@ class Reloj:
 @pytest.fixture()
 def reloj():
     return Reloj()
+
+
+@pytest.fixture(autouse=True)
+def sin_limites_previos():
+    from src.utils import limites
+    limites.reiniciar_todos()
 
 
 @pytest.fixture()
@@ -64,10 +71,36 @@ def client(reloj, monkeypatch):
 
     app.dependency_overrides[get_db] = _db
     app.dependency_overrides[get_ahora] = reloj
-    yield TestClient(app, base_url="http://testserver/api")
+    c = ClienteZeno(app, base_url="http://testserver/api")
+    # Un administrador para los endpoints de administración (precios, activos, dividendos)
+    db = Session()
+    InversorService(db).crear("admin@test.com", "Admin Prueba", "30711111111", "agresivo", PASSWORD, es_admin=True)
+    db.close()
+    c.admin = {"Authorization": "Bearer " + c.post("/auth/ingresar", json={"email": "admin@test.com", "password": PASSWORD}).json()["token"]}
+    yield c
     app.dependency_overrides.clear()
     Base.metadata.drop_all(engine)
     engine.dispose()
+
+
+# ---------- cliente con sesión ----------
+class ClienteZeno(TestClient):
+    """TestClient que manda la sesión del inversor "actual" (el último creado con nuevo_inversor, o el que se elija
+    con client.como(inv)). Un header Authorization explícito tiene prioridad, y client.como(None) prueba sin sesión."""
+
+    def __init__(self, *a, **kw):
+        super().__init__(*a, **kw)
+        self.sesion: dict | None = None
+        self.admin: dict = {}
+
+    def como(self, inversor: dict | None) -> None:
+        self.sesion = inversor["headers"] if inversor else None
+
+    def request(self, method, url, **kw):
+        headers = dict(kw.pop("headers", None) or {})
+        if self.sesion and not any(k.lower() == "authorization" for k in headers):
+            headers.update(self.sesion)
+        return super().request(method, url, headers=headers, **kw)
 
 
 # ---------- helpers ----------
@@ -90,12 +123,16 @@ def nuevo_inversor(client, perfil="agresivo", email=None):
         "email": email or f"inv{n}@test.com", "nombre": "Test Prueba", "cuit": n, "perfil_riesgo": perfil,
         "password": PASSWORD})
     assert r.status_code == 201, r.text
-    return r.json()
+    inv = r.json()
+    token = client.post("/auth/ingresar", json={"email": inv["email"], "password": PASSWORD}).json()["token"]
+    inv["headers"] = {"Authorization": f"Bearer {token}"}
+    client.como(inv)  # los pedidos siguientes van con la sesión de este inversor
+    return inv
 
 
 def nuevo_activo(client, ticker, tipo="accion", moneda="ARS", precio=100, riesgo=3):
     r = client.post("/activos", json={"ticker": ticker, "nombre": ticker, "tipo": tipo, "moneda": moneda,
-                                      "precio_actual": precio, "nivel_riesgo": riesgo})
+                                      "precio_actual": precio, "nivel_riesgo": riesgo}, headers=client.admin)
     assert r.status_code == 201, r.text
     return r.json()
 

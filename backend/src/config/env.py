@@ -1,7 +1,7 @@
 import os
 
 from dotenv import load_dotenv
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Carga el .env también en os.environ: algunos módulos (horario de mercado, precios reales)
 # leen las variables con os.getenv para poder cambiarlas en los tests.
@@ -17,9 +17,7 @@ class Settings(BaseSettings):
     # Orígenes permitidos para el front (separados por coma)
     CORS_ORIGINS: str = "http://localhost:3000"
 
-    class Config:
-        env_file = ".env"
-        extra = "ignore"
+    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
 
 settings = Settings()

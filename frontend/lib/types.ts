@@ -71,6 +71,8 @@ export interface EstadoHistorial {
 export interface EstadoMercado {
   abierto: boolean;
   en_horario: boolean;
+  /** Hoy es feriado en Argentina (BYMA no opera). */
+  feriado?: boolean;
   modo_demo: boolean;
   hora_argentina: string;
   horario: string;

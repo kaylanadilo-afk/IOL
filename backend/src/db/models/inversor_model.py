@@ -50,6 +50,11 @@ class Inversor(Base):
     codigo_expira: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     codigo_enviado: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     codigo_intentos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Cambio de contraseña pendiente: la nueva (ya hasheada) se aplica recién al confirmar el código del correo
+    pwd_nueva_hash: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    pwd_codigo_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    pwd_codigo_expira: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    pwd_intentos: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     cuenta: Mapped["Cuenta"] = relationship(back_populates="inversor", uselist=False)
     favoritos: Mapped[list["Activo"]] = relationship(secondary=favoritos, order_by="Activo.ticker")

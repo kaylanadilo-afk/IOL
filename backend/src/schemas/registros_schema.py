@@ -5,11 +5,20 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
-from src.schemas.broker_schema import Moneda, OrdenSchema, Perfil, TipoActivo, TipoOperacion, _positivo
+from src.schemas.broker_schema import MAXIMO, Moneda, OrdenSchema, Perfil, TipoActivo, TipoOperacion, _positivo
 from src.utils.validaciones import validar_cuit, validar_email, validar_nombre
 
 EstadoOperacion = Literal["ejecutada", "pendiente", "rechazada"]
 TipoTransferencia = Literal["deposito", "extraccion"]
+
+
+def sin_nulos(datos):
+    """Un campo que se manda vacío (null) no significa "dejarlo igual": se rechaza con un mensaje claro."""
+    if isinstance(datos, dict):
+        vacios = [k for k, v in datos.items() if v is None]
+        if vacios:
+            raise ValueError(f"{', '.join(vacios)}: no puede ir vacío (si no querés cambiarlo, no lo mandes)")
+    return datos
 
 
 def _algo(modelo: BaseModel) -> BaseModel:
@@ -20,6 +29,11 @@ def _algo(modelo: BaseModel) -> BaseModel:
 
 # ---------- Inversores ----------
 class UpdateInversorSchema(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _sin_nulos(cls, datos):
+        return sin_nulos(datos)
+
     email: str | None = None
     nombre: str | None = None
     cuit: str | None = None
@@ -53,6 +67,11 @@ class CreateCuentaSchema(BaseModel):
 class UpdateCuentaSchema(BaseModel):
     """Ajuste manual de saldos (corrección del administrador)."""
 
+    @model_validator(mode="before")
+    @classmethod
+    def _sin_nulos(cls, datos):
+        return sin_nulos(datos)
+
     saldo_ars: Decimal | None = None
     saldo_usd: Decimal | None = None
 
@@ -61,6 +80,8 @@ class UpdateCuentaSchema(BaseModel):
     def _saldo(cls, v: Decimal | None) -> Decimal | None:
         if v is not None and (v < 0 or v.as_tuple().exponent < -2):
             raise ValueError("el saldo no puede ser negativo y admite hasta 2 decimales")
+        if v is not None and v > MAXIMO:
+            raise ValueError("el saldo es demasiado grande (máximo 1.000.000.000.000)")
         return v
 
     @model_validator(mode="after")
@@ -70,6 +91,11 @@ class UpdateCuentaSchema(BaseModel):
 
 # ---------- Activos ----------
 class UpdateActivoSchema(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _sin_nulos(cls, datos):
+        return sin_nulos(datos)
+
     nombre: str | None = None
     tipo: TipoActivo | None = None
     moneda: Moneda | None = None
@@ -150,19 +176,24 @@ class CreateTenenciaSchema(BaseModel):
     @field_validator("cantidad")
     @classmethod
     def _cantidad(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError("la cantidad tiene que ser un entero mayor a 0")
+        if not 1 <= v <= 10_000_000:
+            raise ValueError("la cantidad tiene que ser un entero entre 1 y 10.000.000")
         return v
 
     @field_validator("precio_promedio")
     @classmethod
     def _precio(cls, v: Decimal) -> Decimal:
-        if v < 0:
-            raise ValueError("el precio promedio no puede ser negativo")
+        if v < 0 or v > MAXIMO or v.as_tuple().exponent < -4:
+            raise ValueError("el precio promedio tiene que estar entre 0 y 1.000.000.000.000, con hasta 4 decimales")
         return v
 
 
 class UpdateTenenciaSchema(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _sin_nulos(cls, datos):
+        return sin_nulos(datos)
+
     cantidad: int | None = None
     precio_promedio: Decimal | None = None
 
@@ -188,6 +219,11 @@ class UpdateTenenciaSchema(BaseModel):
 # ---------- Dividendos ----------
 class UpdateDividendoSchema(BaseModel):
     """Corrige el registro del dividendo (no vuelve a pagar ni descuenta lo ya acreditado)."""
+
+    @model_validator(mode="before")
+    @classmethod
+    def _sin_nulos(cls, datos):
+        return sin_nulos(datos)
 
     monto_por_unidad: Decimal | None = None
     fecha_pago: date | None = None

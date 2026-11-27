@@ -32,6 +32,9 @@ def validar_perfil(inversor: Inversor, activo: Activo) -> None:
         )
 
 
+MAX_TENENCIA = 2_000_000_000  # la columna es un entero de 32 bits
+
+
 class OperacionService:
     def __init__(self, db: Session):
         self.db = db
@@ -62,8 +65,16 @@ class OperacionService:
                 f"Con {fmt(monto_ars, 'ARS')} no alcanza para comprar 1 nominal de AL30 "
                 f"({fmt(al30.precio_actual * (1 + COMISION), 'ARS')} con comisión)."
             )
+        # El MEP compra y vende la misma cantidad de AL30 en el acto: la tenencia que ya tenías no cambia,
+        # así que su precio promedio se deja como estaba (si no, la próxima venta calcula mal la ganancia)
+        previa = self.cuentas.tenencia(cuenta_id, al30.id)
+        promedio_previo = previa.precio_promedio if previa else None
         compra = self._comprar(cuenta_id, al30, cantidad, ahora)
         venta = self._vender(cuenta_id, al30d, cantidad, ahora, activo_tenencia=al30)
+        if promedio_previo is not None:
+            tenencia = self.cuentas.tenencia(cuenta_id, al30.id)
+            if tenencia:
+                tenencia.precio_promedio = promedio_previo
         self.db.commit()
         return MepDTO(tipo_cambio=q2(al30.precio_actual / al30d.precio_actual), cantidad_nominales=cantidad,
                       pesos_debitados=compra.total, dolares_acreditados=venta.total,
@@ -85,7 +96,8 @@ class OperacionService:
         )
         comisiones = {"ARS": Decimal("0"), "USD": Decimal("0")}
         for op in ops:
-            comisiones[op.activo.moneda] += op.comision
+            if op.estado == "ejecutada":
+                comisiones[op.activo.moneda] += op.comision
         return to_json({"operaciones": [to_operacion(o) for o in ops], "cantidad": len(ops),
                         "total_comisiones": comisiones})
 
@@ -108,6 +120,8 @@ class OperacionService:
         cuenta.ajustar_saldo(activo.moneda, -total)
 
         tenencia = self.cuentas.tenencia(cuenta.id, activo.id)
+        if tenencia and tenencia.cantidad + cantidad > MAX_TENENCIA:
+            raise BusinessError(f"No podés tener más de {MAX_TENENCIA:,} unidades de un mismo activo.".replace(",", "."))
         if tenencia:  # precio promedio ponderado (sin comisión)
             nueva = tenencia.cantidad + cantidad
             tenencia.precio_promedio = q4((tenencia.cantidad * tenencia.precio_promedio + cantidad * precio) / nueva)

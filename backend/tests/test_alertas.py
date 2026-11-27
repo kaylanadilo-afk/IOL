@@ -14,7 +14,11 @@ from tests.conftest import PASSWORD, nuevo_activo, nuevo_inversor
 @pytest.fixture
 def mails(monkeypatch):
     enviados = []
-    monkeypatch.setattr(correo, "despachar", lambda destino, asunto, texto, html: enviados.append((destino, asunto, texto)))
+    def despachar(destino, asunto, texto, html, al_enviar=None):
+        enviados.append((destino, asunto, texto))
+        if al_enviar:  # el correo "salió": se marca como enviado
+            al_enviar()
+    monkeypatch.setattr(correo, "despachar", despachar)
     return enviados
 
 
@@ -25,7 +29,7 @@ def sesion(client, inv=None):
 
 
 def precio(client, activo_id, valor):
-    r = client.patch(f"/activos/{activo_id}/precio", json={"precio": valor})
+    r = client.patch(f"/activos/{activo_id}/precio", json={"precio": valor}, headers=client.admin)
     assert r.status_code == 200, r.text
 
 

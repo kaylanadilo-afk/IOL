@@ -4,6 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, field_validator, model_validator
 
+from src.schemas.registros_schema import sin_nulos
+
 TipoAlerta = Literal["sube_pct", "baja_pct", "precio"]
 
 
@@ -42,6 +44,11 @@ class CreateAlertaSchema(BaseModel):
 
 
 class UpdateAlertaSchema(BaseModel):
+    @model_validator(mode="before")
+    @classmethod
+    def _sin_nulos(cls, datos):
+        return sin_nulos(datos)
+
     tipo: TipoAlerta | None = None
     valor: Decimal | None = None
     recurrente: bool | None = None

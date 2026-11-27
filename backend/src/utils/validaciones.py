@@ -28,6 +28,20 @@ def validar_dns() -> bool:
     return os.getenv("VALIDAR_EMAIL_DNS", "1") != "0"
 
 
+MAX_CACHE = 2000
+
+
+def _recortar_cache() -> None:
+    """La caché de correos revisados no crece sin fin: se sacan los vencidos y, si hace falta, los más viejos."""
+    if len(_revisados) <= MAX_CACHE:
+        return
+    ahora = time.monotonic()
+    for k in [k for k, (t, _, _) in _revisados.items() if ahora - t >= DURACION_CACHE]:
+        del _revisados[k]
+    for k in sorted(_revisados, key=lambda k: _revisados[k][0])[: max(0, len(_revisados) - MAX_CACHE)]:
+        del _revisados[k]
+
+
 def validar_email(v: str) -> str:
     v = v.strip()
     if not v:
@@ -43,8 +57,10 @@ def validar_email(v: str) -> str:
             email = _validar_email(v, dns)
         except ValueError as e:
             _revisados[v.lower()] = (time.monotonic(), str(e), v)
+            _recortar_cache()
             raise
         _revisados[v.lower()] = (time.monotonic(), None, email)
+        _recortar_cache()
         return email
     return _validar_email(v, dns)
 

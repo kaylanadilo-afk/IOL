@@ -100,11 +100,20 @@ class RegistrosService:
         self._guardar()
 
     # ---------- Activos ----------
-    def actualizar_activo(self, activo_id: int, cambios: dict) -> ActivoDTO:
+    def actualizar_activo(self, activo_id: int, cambios: dict, ahora: datetime | None = None) -> ActivoDTO:
         activo = self._get(Activo, "Activo", activo_id)
+        en_uso = self.repo.contar(Operacion, activo_id=activo.id) or self.repo.contar(Tenencia, activo_id=activo.id)
+        for campo in ("tipo", "moneda"):
+            if campo in cambios and cambios[campo] != getattr(activo, campo) and en_uso:
+                raise BusinessError(f"No se puede cambiar el {campo} de un activo que ya se operó o que alguien tiene.",
+                                    campo=campo)
+        precio = cambios.pop("precio_actual", None)
         for campo, valor in cambios.items():
             setattr(activo, campo, valor)
         self._guardar()
+        if precio is not None:  # mismo camino que PATCH /precio: historial y alertas
+            from src.services.activo_service import ActivoService
+            return ActivoService(self.db).actualizar_precio(activo.id, precio, ahora)
         return to_activo(activo)
 
     def borrar_activo(self, activo_id: int) -> None:

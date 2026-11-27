@@ -49,7 +49,7 @@ try {
     } else {
         $python = Join-Path $back ".venv\Scripts\python.exe"
         if (-not (Test-Path $python)) { throw "No encuentro el entorno de Python en $python" }
-        $cmd = "`$host.UI.RawUI.WindowTitle = 'Zeno - API (no cerrar)'; Set-Location '$back'; & '$python' -m uvicorn src.app:app --host 0.0.0.0 --port 8000"
+        $cmd = "`$host.UI.RawUI.WindowTitle = 'Zeno - API (no cerrar)'; Set-Location '$back'; & '$python' -m uvicorn src.app:app --host 127.0.0.1 --port 8000"
         Start-Process powershell -ArgumentList "-NoExit", "-NoProfile", "-Command", $cmd -WindowStyle Minimized
         if (Esperar 8000 40) { Write-Host "  Lista." } else { Write-Host "  Tarda en arrancar: mira la ventana 'Zeno - API'." -ForegroundColor Yellow }
     }

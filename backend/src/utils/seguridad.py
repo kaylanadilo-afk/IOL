@@ -39,6 +39,10 @@ def hash_codigo(inversor_id: int, codigo: str) -> str:
     return hmac.new(_CLAVE, f"{inversor_id}:{codigo}".encode(), hashlib.sha256).hexdigest()
 
 
+# Para el login con un email inexistente: se compara igual contra esto y tarda lo mismo
+HASH_FALSO = hashear(secrets.token_hex(16))
+
+
 def _b64(b: bytes) -> str:
     return base64.urlsafe_b64encode(b).rstrip(b"=").decode()
 
@@ -64,5 +68,5 @@ def leer_token(token: str) -> dict | None:
             return None
         datos = json.loads(_unb64(cuerpo))
         return datos if datos.get("exp", 0) > time.time() else None
-    except (ValueError, json.JSONDecodeError):
+    except (ValueError, TypeError, AttributeError, UnicodeError, json.JSONDecodeError):
         return None

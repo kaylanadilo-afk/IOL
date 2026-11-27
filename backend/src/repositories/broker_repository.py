@@ -95,6 +95,11 @@ class ActivoRepository:
         self.db.add(obj)
         self.db.flush()
 
+    def dividendo_igual(self, activo_id: int, fecha_pago: date, monto_por_unidad) -> bool:
+        return self.db.scalar(select(func.count()).select_from(Dividendo).where(
+            Dividendo.activo_id == activo_id, Dividendo.fecha_pago == fecha_pago,
+            Dividendo.monto_por_unidad == monto_por_unidad)) > 0
+
     def add_dividendo(self, div: Dividendo) -> None:
         self.db.add(div)
 
@@ -133,12 +138,12 @@ class OperacionRepository:
             select(Activo, func.count(Operacion.id), func.sum(Operacion.cantidad),
                    func.sum(Operacion.cantidad * Operacion.precio_unitario))
             .join(Operacion, Operacion.activo_id == Activo.id)
-            .where(Operacion.fecha >= desde)
+            .where(Operacion.fecha >= desde, Operacion.estado == "ejecutada")
             .group_by(Activo.id)).all()]
 
     def ventas_con_ganancia(self, cuenta_id: int) -> list[Operacion]:
         return list(self.db.scalars(select(Operacion).where(
-            Operacion.cuenta_id == cuenta_id, Operacion.tipo == "venta",
+            Operacion.cuenta_id == cuenta_id, Operacion.tipo == "venta", Operacion.estado == "ejecutada",
             Operacion.ganancia_realizada.is_not(None))))
 
 

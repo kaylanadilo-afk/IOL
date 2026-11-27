@@ -4,6 +4,7 @@
     python -m src.db.seeders.seed --reset    -> borra las tablas del broker y vuelve a cargar
 """
 import os
+import secrets
 import sys
 from datetime import datetime, time, timedelta
 from decimal import Decimal as D
@@ -49,18 +50,19 @@ INVERSORES = [
     ("lucia@aula.test", "Lucía Fernández", "27222222223", "agresivo"),
     ("martin@aula.test", "Martín Gómez", "20333333334", "conservador"),
 ]
-TABLAS_BROKER = ("favoritos", "operaciones", "movimientos", "tenencias", "dividendos", "cierres_diarios",
+TABLAS_BROKER = ("notificaciones", "alertas", "favoritos", "operaciones", "movimientos", "tenencias", "dividendos", "cierres_diarios",
                  "cotizaciones_intradia", "cuentas", "inversores", "activos")
 
 
 def crear_admin(db) -> None:
     """Perfiles autorizados para la sección de Administración (activos, precios, dividendos).
 
-    Además del admin de ejemplo, si el .env define ADMIN_EMAIL y ADMIN_PASSWORD se crea esa cuenta
-    (así la contraseña real no queda en el repositorio).
+    Si el .env define ADMIN_EMAIL y ADMIN_PASSWORD se crea esa cuenta (la contraseña real no queda en el
+    repositorio). Si no, se crea el admin de ejemplo con una contraseña al azar que se muestra una sola vez:
+    una contraseña fija y pública sería una puerta abierta si la API queda accesible en la red.
     """
     repo, servicio = InversorRepository(db), InversorService(db)
-    email, clave = os.getenv("ADMIN_EMAIL"), os.getenv("ADMIN_PASSWORD")
+    email, clave = (os.getenv("ADMIN_EMAIL") or "").strip().lower(), os.getenv("ADMIN_PASSWORD")
     if email and clave:
         if not repo.find_by_email(email):
             servicio.crear(email, os.getenv("ADMIN_NOMBRE", "Administración"), os.getenv("ADMIN_CUIT", "30711111111"),
@@ -68,7 +70,9 @@ def crear_admin(db) -> None:
         return
     if not repo.find_by_email(ADMIN[0]):
         e, n, c, p = ADMIN
-        servicio.crear(e, n, c, p, PASSWORD_DEMO, es_admin=True)
+        clave_azar = secrets.token_urlsafe(12)
+        servicio.crear(e, n, c, p, clave_azar, es_admin=True)
+        print(f"Administrador de ejemplo: {e} / {clave_azar}  (guardala: no se vuelve a mostrar)")
 
 
 def dia_habil(dias_atras: int, hora: int = 12) -> datetime:

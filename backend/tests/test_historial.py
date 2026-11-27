@@ -25,7 +25,7 @@ def sesion():
 
 def patch_precio(client, reloj, activo_id, precio, cuando):
     reloj.ahora = cuando
-    r = client.patch(f"/activos/{activo_id}/precio", json={"precio": precio})
+    r = client.patch(f"/activos/{activo_id}/precio", json={"precio": precio}, headers=client.admin)
     assert r.status_code == 200, r.text
 
 

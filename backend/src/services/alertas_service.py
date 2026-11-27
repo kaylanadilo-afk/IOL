@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select, update
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, sessionmaker
 
 from src.db.models.activo_model import Activo
 from src.db.models.alerta_model import Alerta, Notificacion
@@ -121,6 +121,8 @@ class AlertasService:
         rearmar = any(k in cambios and cambios[k] != getattr(al, k) for k in ("tipo", "valor"))
         for k, v in cambios.items():
             setattr(al, k, v)
+        if al.tipo != "precio" and Decimal(al.valor) > 1000:
+            raise BusinessError("El porcentaje puede ser de hasta 1000 %.", campo="valor")
         if not (al.aviso_email or al.aviso_app):
             raise BusinessError("Elegí al menos una forma de aviso.", campo="aviso_email")
         if rearmar or al.estado == "ejecutada":
@@ -207,9 +209,12 @@ class AlertasService:
 
         inversor = self.db.get(Inversor, al.inversor_id)
         enviar = al.aviso_email and inversor is not None and inversor.email_verificado
-        self.db.add(Notificacion(inversor_id=al.inversor_id, alerta_id=al.id, activo_id=a.id, titulo=titulo,
-                                 mensaje=mensaje, precio=precio, variacion_pct=variacion, email_enviado=enviar,
-                                 leida=not al.aviso_app, fecha=ahora))
+        # email_enviado se marca recién cuando el correo sale (si falla o no hay SMTP, queda en falso)
+        aviso = Notificacion(inversor_id=al.inversor_id, alerta_id=al.id, activo_id=a.id, titulo=titulo,
+                             mensaje=mensaje, precio=precio, variacion_pct=variacion, email_enviado=False,
+                             leida=not al.aviso_app, fecha=ahora)
+        self.db.add(aviso)
+        self.db.flush()
         condicion = describir(al)
         al.veces_disparada += 1
         al.ultima_vez = ahora
@@ -225,8 +230,19 @@ class AlertasService:
                 nombre=inversor.nombre.split(" ")[0], titulo=titulo, mensaje=mensaje, ticker=a.ticker, nombre_activo=a.nombre,
                 precio=dinero(precio, a.moneda), referencia=dinero(referencia, a.moneda),
                 variacion=("+" if variacion > 0 else "") + porcentaje(variacion), condicion=condicion)
-            correo.despachar(inversor.email, asunto, texto, html)
+            correo.despachar(inversor.email, asunto, texto, html, al_enviar=_marcar_enviado(self.db, aviso.id))
         log.info("Alerta %s disparada: %s a %s", al.id, a.ticker, precio)
+
+
+def _marcar_enviado(db: Session, notificacion_id: int):
+    """Para después del envío (corre en otro hilo): usa una sesión propia sobre la misma base."""
+    fabrica = sessionmaker(bind=db.get_bind(), expire_on_commit=False)
+
+    def marcar() -> None:
+        with fabrica() as s:
+            s.execute(update(Notificacion).where(Notificacion.id == notificacion_id).values(email_enviado=True))
+            s.commit()
+    return marcar
 
 
 def evaluar_con_sesion(activo_ids: list[int] | None = None) -> int:

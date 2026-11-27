@@ -22,6 +22,7 @@ from src.mappers.broker_mapper import to_json
 from src.repositories.broker_repository import ActivoRepository, HistorialRepository
 from src.services.activo_service import obtener_activo
 from src.services.cuenta_service import obtener_cuenta
+from src.utils.feriados import es_feriado
 from src.utils.mercado import TZ_AR, a_utc, q4
 
 log = logging.getLogger("iol.historial")
@@ -48,7 +49,7 @@ def fecha_ar(ahora: datetime) -> date:
 
 def en_rueda(ahora: datetime) -> bool:
     local = a_utc(ahora).astimezone(TZ_AR)
-    return local.weekday() < 5 and time(11, 0) <= local.time() <= FIN_RUEDA
+    return local.weekday() < 5 and not es_feriado(local.date()) and time(11, 0) <= local.time() <= FIN_RUEDA
 
 
 def _rango_dia(d: date) -> tuple[datetime, datetime]:
@@ -216,17 +217,19 @@ def cargar_historial(db: Session, ahora: datetime | None = None) -> dict:
             try:
                 if not filas:
                     filas = _cierres_yahoo(client, activo, desde)
-                res["cierres"] += guardar_cierres(db, activo, filas)
-                db.flush()
+                # Savepoint por activo: si la base rechaza algo de este activo, se deshace solo lo suyo
+                with db.begin_nested():
+                    res["cierres"] += guardar_cierres(db, activo, filas)
             except Exception as exc:
                 res["errores"].append(f"{activo.ticker} (cierres): {type(exc).__name__}")
                 continue
             if activo.tipo != "bono":
                 try:
-                    antes = len(db.new)
-                    dias = guardar_intradia(db, activo, _velas_yahoo(client, activo))
-                    res["puntos_intradia"] += len(db.new) - antes
-                    db.flush()
+                    velas = _velas_yahoo(client, activo)
+                    with db.begin_nested():
+                        antes = len(db.new)
+                        dias = guardar_intradia(db, activo, velas)
+                        res["puntos_intradia"] += len(db.new) - antes
                     # Hoy todavía no está en data912: el día se arma con los puntos intradiarios
                     if hoy in dias and not any(f["fecha"] == hoy for f in filas):
                         recalcular_dia(db, activo.id, hoy)

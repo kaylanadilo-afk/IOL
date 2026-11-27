@@ -60,7 +60,7 @@ def test_borrar_inversor(client):
     assert client.delete(f"/inversores/{yo['id']}", headers=h).status_code == 422
     assert client.delete(f"/inversores/{con_saldo['id']}", headers=h).status_code == 422
     assert client.delete(f"/inversores/{sin_actividad['id']}", headers=h).status_code == 204
-    assert client.get(f"/inversores/{sin_actividad['id']}").status_code == 404
+    assert client.get(f"/inversores/{sin_actividad['id']}", headers=h).status_code == 404
 
 
 def test_cuentas_abrir_ajustar_y_borrar(client):
@@ -109,7 +109,10 @@ def test_tenencias(client):
     inv = nuevo_inversor(client)
     cid = inv["cuenta"]["id"]
     datos = {"cuenta_id": cid, "activo_id": act["id"], "cantidad": 10, "precio_promedio": 95.5}
-    assert client.post("/tenencias", json=datos).status_code == 401
+    client.como(None)
+    assert client.post("/tenencias", json=datos).status_code == 401  # sin sesión
+    client.como(inv)
+    assert client.post("/tenencias", json=datos).status_code == 403  # con sesión, pero no es administrador
     assert client.post("/tenencias", json=datos, headers=h).status_code == 201
     assert client.post("/tenencias", json=datos, headers=h).status_code == 409
     assert client.get(f"/tenencias/{cid}/{act['id']}").json()["cantidad"] == 10
@@ -123,7 +126,7 @@ def test_tenencias(client):
 def test_dividendos(client):
     _, h = admin(client)
     act = nuevo_activo(client, "KO")
-    div = client.post("/dividendos", json={"activo_id": act["id"], "monto_por_unidad": 10}).json()
+    div = client.post("/dividendos", json={"activo_id": act["id"], "monto_por_unidad": 10}, headers=client.admin).json()
     assert client.get(f"/dividendos/{div['id']}").json()["monto_por_unidad"] == 10
     r = client.put(f"/dividendos/{div['id']}", json={"monto_por_unidad": 12.5}, headers=h)
     assert r.status_code == 200 and r.json()["monto_por_unidad"] == 12.5

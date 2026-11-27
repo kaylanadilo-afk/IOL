@@ -23,6 +23,7 @@ from src.repositories.broker_repository import ActivoRepository
 from src.services import catalogo_service as catalogo
 from src.services.alertas_service import AlertasService
 from src.services import historial_service as historial
+from src.utils import feriados
 from src.utils.mercado import q4
 
 log = logging.getLogger("iol.precios")
@@ -161,13 +162,23 @@ def _historial_con_sesion() -> dict:
 
 
 async def bucle_precios() -> None:
-    """Precios reales cada PRECIOS_INTERVALO segundos e historial una vez por día."""
+    """Precios reales cada PRECIOS_INTERVALO segundos, e historial y feriados una vez por día.
+
+    Un error en una vuelta queda en el log y la tarea sigue: si no, los precios dejarían de actualizarse
+    sin que nadie se entere hasta reiniciar la API.
+    """
     dia_historial = None
     while True:
-        await asyncio.to_thread(_sincronizar_con_sesion)
-        hoy = historial.fecha_ar(datetime.now(timezone.utc))
-        if dia_historial != hoy:
-            await asyncio.to_thread(_historial_con_sesion)
-            if not historial.estado_historial["error"]:
-                dia_historial = hoy
+        try:
+            await asyncio.to_thread(_sincronizar_con_sesion)
+            hoy = historial.fecha_ar(datetime.now(timezone.utc))
+            if dia_historial != hoy:
+                await asyncio.to_thread(feriados.cargar_si_falta, hoy)
+                await asyncio.to_thread(_historial_con_sesion)
+                if not historial.estado_historial["error"]:
+                    dia_historial = hoy
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            log.exception("Falló una vuelta de la actualización de precios; se reintenta en la próxima")
         await asyncio.sleep(intervalo())

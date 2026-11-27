@@ -5,11 +5,24 @@ Cada paso revisa primero si ya está aplicado, así que se puede correr en cada 
 from sqlalchemy import inspect, text
 
 COLUMNAS_INVERSOR = {
+    # Bases creadas antes de la sesión con contraseña y la sección de administración
+    "es_admin": "BOOLEAN NOT NULL DEFAULT false",
+    "password_hash": "VARCHAR(200)",
     "email_verificado": "BOOLEAN NOT NULL DEFAULT false",
     "codigo_hash": "VARCHAR(128)",
     "codigo_expira": "TIMESTAMP WITH TIME ZONE",
     "codigo_enviado": "TIMESTAMP WITH TIME ZONE",
     "codigo_intentos": "INTEGER NOT NULL DEFAULT 0",
+    "pwd_nueva_hash": "VARCHAR(200)",
+    "pwd_codigo_hash": "VARCHAR(128)",
+    "pwd_codigo_expira": "TIMESTAMP WITH TIME ZONE",
+    "pwd_intentos": "INTEGER NOT NULL DEFAULT 0",
+}
+
+# Bases creadas antes de los precios reales
+COLUMNAS_ACTIVO = {
+    "variacion_pct": "NUMERIC(9, 2)",
+    "precio_actualizado": "TIMESTAMP WITH TIME ZONE",
 }
 
 # Del script "PROYECTO 6" (tables.sql): restricciones e índices que nuestra base no tenía
@@ -44,10 +57,20 @@ def aplicar(engine) -> None:
             # Los administradores ya existentes quedan confirmados; el resto confirma al ingresar
             c.execute(text("UPDATE inversores SET email_verificado = true WHERE es_admin"))
 
-        # Favoritos: cuándo se agregó cada uno (los anteriores quedan con la fecha de hoy)
+        actuales = {col["name"] for col in insp.get_columns("activos")}
+        for nombre, tipo in COLUMNAS_ACTIVO.items():
+            if nombre not in actuales:
+                c.execute(text(f"ALTER TABLE activos ADD COLUMN {nombre} {tipo}"))
+
+        # Favoritos: cuándo se agregó cada uno (los anteriores quedan con la fecha de hoy).
+        # SQLite no acepta DEFAULT CURRENT_TIMESTAMP al agregar una columna: se agrega y se completa aparte
         if "fecha_agregado" not in {col["name"] for col in insp.get_columns("favoritos")}:
-            c.execute(text("ALTER TABLE favoritos ADD COLUMN fecha_agregado TIMESTAMP WITH TIME ZONE "
-                           "NOT NULL DEFAULT CURRENT_TIMESTAMP"))
+            if engine.dialect.name == "postgresql":
+                c.execute(text("ALTER TABLE favoritos ADD COLUMN fecha_agregado TIMESTAMP WITH TIME ZONE "
+                               "NOT NULL DEFAULT CURRENT_TIMESTAMP"))
+            else:
+                c.execute(text("ALTER TABLE favoritos ADD COLUMN fecha_agregado TIMESTAMP"))
+                c.execute(text("UPDATE favoritos SET fecha_agregado = CURRENT_TIMESTAMP"))
 
         # Restricciones CHECK (SQLite no permite agregarlas a una tabla existente: ahí ya las crea create_all)
         if engine.dialect.name == "postgresql":

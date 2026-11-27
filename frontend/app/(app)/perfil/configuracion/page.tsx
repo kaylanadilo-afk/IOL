@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { api, guardarToken } from "@/lib/api";
+import { api, ApiError, guardarToken } from "@/lib/api";
 import { PERFILES, RIESGO_MAX } from "@/lib/format";
 import type { Perfil } from "@/lib/types";
 import { useMe } from "@/context/SessionContext";
 import { useUI } from "@/context/UIContext";
-import { PasswordField, RiskDots } from "@/components/ui";
+import { FieldError, PasswordField, RiskDots } from "@/components/ui";
 
 const PERFILES_INFO: Record<Perfil, string> = {
   conservador: "Priorizás cuidar tu capital: bonos y activos defensivos.",
@@ -117,38 +117,100 @@ function PasswordCard({ inversorId }: { inversorId: number }) {
   const [actual, setActual] = useState("");
   const [nueva, setNueva] = useState("");
   const [rep, setRep] = useState("");
-  const [msg, setMsg] = useState<{ text: string; ok: boolean }>({ text: "", ok: false });
+  const [errores, setErrores] = useState<Record<string, string>>({});
+  const [general, setGeneral] = useState("");
   const [busy, setBusy] = useState(false);
+  // Paso 2: a qué correo se mandó el código
+  const [enviado, setEnviado] = useState<{ email: string; minutos: number } | null>(null);
+  const [codigo, setCodigo] = useState("");
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (nueva.length < 8) return setMsg({ text: "La contraseña nueva tiene que tener al menos 8 caracteres.", ok: false });
-    if (nueva !== rep) return setMsg({ text: "Las contraseñas nuevas no coinciden.", ok: false });
+  const fallo = (err: unknown) => {
+    const campos = err instanceof ApiError ? err.campos : {};
+    if (Object.keys(campos).length) setErrores(campos);
+    else setGeneral((err as Error).message);
+  };
+
+  // Paso 1: se revisa la contraseña actual y llega un código al correo (la contraseña todavía no cambia)
+  const pedir = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    setGeneral("");
+    const errs: Record<string, string> = {};
+    if (!actual) errs.actual = "Ingresá tu contraseña actual";
+    if (nueva.length < 8) errs.nueva = "La contraseña nueva tiene que tener al menos 8 caracteres";
+    else if (nueva !== rep) errs.rep = "Las contraseñas nuevas no coinciden";
+    setErrores(errs);
+    if (Object.keys(errs).length) return;
     setBusy(true);
     try {
-      const r = await api.cambiarPassword(inversorId, actual, nueva);
-      guardarToken(r.token); // las otras sesiones dejan de valer; esta sigue con un token nuevo
-      setActual(""); setNueva(""); setRep("");
-      setMsg({ text: "Listo: tu contraseña cambió.", ok: true });
-      toast("Contraseña actualizada.");
+      const r = await api.pedirCambioPassword(inversorId, actual, nueva);
+      setEnviado({ email: r.email, minutos: r.minutos });
+      setCodigo("");
+      toast(`Te mandamos un código a ${r.email}.`);
     } catch (err) {
-      setMsg({ text: (err as Error).message, ok: false });
+      fallo(err);
     } finally {
       setBusy(false);
     }
   };
 
+  // Paso 2: con el código del correo se aplica el cambio
+  const confirmar = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setGeneral("");
+    if (!/^\d{6}$/.test(codigo)) return setErrores({ codigo: "Ingresá los 6 dígitos del código" });
+    setBusy(true);
+    try {
+      const r = await api.confirmarCambioPassword(inversorId, codigo);
+      guardarToken(r.token); // las otras sesiones dejan de valer; esta sigue con un token nuevo
+      setActual(""); setNueva(""); setRep(""); setCodigo(""); setEnviado(null); setErrores({});
+      toast("Listo: tu contraseña cambió. Te avisamos por correo.");
+    } catch (err) {
+      fallo(err);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (enviado) {
+    return (
+      <form className="card" noValidate onSubmit={confirmar} id="password">
+        <div className="ctitle"><h2>Confirmá el cambio</h2></div>
+        <p className="pf-sub">
+          Te mandamos un código de 6 dígitos a <b>{enviado.email}</b>. Vence en {enviado.minutos} minutos.
+          Tu contraseña no cambia hasta que lo ingreses.
+        </p>
+        <div className={`field${errores.codigo ? " invalid" : ""}`}>
+          <label htmlFor="pwdCodigo">Código del correo</label>
+          <input id="pwdCodigo" className="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus
+            placeholder="000000" value={codigo} aria-invalid={!!errores.codigo}
+            aria-describedby={errores.codigo ? "pwdCodigo-err" : undefined}
+            onChange={(e) => { setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6)); setErrores({}); }} />
+          <FieldError id="pwdCodigo" error={errores.codigo} />
+        </div>
+        <div className="err" role="alert">{general}</div>
+        <div className="form-actions">
+          <button type="button" className="btn btn-ghost" onClick={() => { setEnviado(null); setErrores({}); setGeneral(""); }}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Confirmando…" : "Cambiar contraseña"}</button>
+        </div>
+        <button type="button" className="link-btn" disabled={busy} onClick={() => pedir()}>¿No te llegó? Mandar otro código</button>
+      </form>
+    );
+  }
+
   return (
-    <form className="card" noValidate onSubmit={onSubmit} id="password">
+    <form className="card" noValidate onSubmit={pedir} id="password">
       <div className="ctitle"><h2>Contraseña</h2></div>
-      <p className="pf-sub">Al cambiarla, se cierran las otras sesiones abiertas.</p>
-      <PasswordField id="passActual" label="Contraseña actual" autoComplete="current-password" value={actual} onChange={setActual} />
+      <p className="pf-sub">Para cambiarla te vamos a mandar un código a tu correo. Al confirmarlo se cierran las otras sesiones abiertas.</p>
+      <PasswordField id="passActual" label="Contraseña actual" autoComplete="current-password" value={actual}
+        error={errores.actual} onChange={(v) => { setActual(v); setErrores((x) => ({ ...x, actual: "" })); }} />
       <div className="g2e grid" style={{ gap: 10 }}>
-        <PasswordField id="passNueva" label="Nueva (mínimo 8)" autoComplete="new-password" value={nueva} onChange={setNueva} />
-        <PasswordField id="passRepetir" label="Repetir la nueva" autoComplete="new-password" value={rep} onChange={setRep} />
+        <PasswordField id="passNueva" label="Nueva (mínimo 8)" autoComplete="new-password" value={nueva}
+          error={errores.nueva} onChange={(v) => { setNueva(v); setErrores((x) => ({ ...x, nueva: "" })); }} />
+        <PasswordField id="passRepetir" label="Repetir la nueva" autoComplete="new-password" value={rep}
+          error={errores.rep} onChange={(v) => { setRep(v); setErrores((x) => ({ ...x, rep: "" })); }} />
       </div>
-      <button className="btn btn-primary" type="submit" disabled={busy}>Cambiar contraseña</button>
-      <div className={`form-msg${msg.ok ? " up" : ""}`}>{msg.text}</div>
+      <div className="err" role="alert">{general}</div>
+      <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? "Enviando código…" : "Enviarme un código"}</button>
     </form>
   );
 }

@@ -14,7 +14,7 @@ def mails(monkeypatch):
     """Activa la verificación y guarda los correos en vez de mandarlos."""
     enviados = []
     monkeypatch.setenv("VERIFICAR_EMAIL", "1")
-    monkeypatch.setattr(correo, "despachar", lambda destino, asunto, texto, html: enviados.append((destino, texto)))
+    monkeypatch.setattr(correo, "despachar", lambda destino, asunto, texto, html, al_enviar=None: enviados.append((destino, texto)))
     return enviados
 
 

@@ -122,18 +122,33 @@ export function StarButton({ a }: { a: Activo }) {
   );
 }
 
-export function textoMercado(m: { abierto: boolean; en_horario: boolean } | null): string {
-  if (!m) return "…";
-  if (!m.abierto) return "Mercado cerrado";
-  return m.en_horario ? "Mercado abierto" : "Mercado abierto 24 h";
+type Mercado = { abierto: boolean; en_horario: boolean; feriado?: boolean } | null;
+
+/** Estado de la bolsa para mostrar: el color dice si BYMA está operando de verdad, no solo si la app deja operar.
+ *  Verde: rueda abierta. Amarillo: BYMA cerrada pero la app deja operar (modo práctica 24 h). Rojo: cerrado. */
+export function estadoMercado(m: Mercado): { texto: string; clase: string; ayuda: string } {
+  const horario = "BYMA opera de lunes a viernes de 11 a 17 (hora argentina)";
+  if (!m) return { texto: "…", clase: "", ayuda: horario };
+  const motivo = m.feriado ? "Hoy es feriado" : "Ahora la bolsa está cerrada";
+  if (m.en_horario) return { texto: "Mercado abierto", clase: "on", ayuda: `Rueda abierta. ${horario}.` };
+  if (m.abierto) {
+    return { texto: "Fuera de horario", clase: "demo",
+      ayuda: `${motivo}. Igual podés operar (modo práctica 24 h) con el último precio. ${horario}.` };
+  }
+  return { texto: "Mercado cerrado", clase: "", ayuda: `${motivo}. ${horario}.` };
+}
+
+export function textoMercado(m: Mercado): string {
+  return estadoMercado(m).texto;
 }
 
 export function MercadoPill() {
   const { mercado } = useSession();
+  const e = estadoMercado(mercado);
   return (
-    <span className="live" title="Se opera de lunes a viernes de 11 a 17 (hora argentina)">
-      <span className={`dot${mercado?.abierto ? " on" : ""}`} />
-      <span>{textoMercado(mercado)}</span>
+    <span className="live" title={e.ayuda}>
+      <span className={`dot ${e.clase}`} />
+      <span>{e.texto}</span>
     </span>
   );
 }

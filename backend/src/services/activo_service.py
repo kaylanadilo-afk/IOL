@@ -14,9 +14,12 @@ from src.utils.mercado import TICKER_MEP_ARS, TICKER_MEP_USD, TZ_AR, a_utc, q2, 
 
 def obtener_activo(db: Session, activo_id: int | None = None, ticker: str | None = None) -> Activo:
     repo = ActivoRepository(db)
-    activo = repo.find_by_id(activo_id) if activo_id is not None else repo.find_by_ticker((ticker or "").upper())
+    ticker = (ticker or "").strip().upper() or None
+    activo = repo.find_by_id(activo_id) if activo_id is not None else repo.find_by_ticker(ticker or "")
     if not activo:
         raise no_encontrado("Activo")
+    if activo_id is not None and ticker and activo.ticker != ticker:
+        raise BusinessError(f"El activo {activo_id} es {activo.ticker}, no {ticker}: revisá el pedido.")
     return activo
 
 
@@ -58,8 +61,9 @@ class ActivoService:
         activo = obtener_activo(self.db, activo_id)
         activo.precio_actual = precio  # las operaciones guardan su propio precio_unitario
         activo.variacion_pct = None
-        activo.precio_actualizado = datetime.now(timezone.utc)
-        if ahora is not None:  # el cambio manual también queda en el gráfico
+        activo.precio_actualizado = a_utc(ahora) if ahora is not None else datetime.now(timezone.utc)
+        # El cambio manual queda en el gráfico solo si es durante la rueda (un sábado no hay cotización)
+        if ahora is not None and historial_service.en_rueda(ahora):
             historial_service.registrar_precio(self.db, activo, precio, ahora)
         self.db.commit()
         # Un cambio manual de precio también revisa las alertas de ese activo
@@ -78,8 +82,16 @@ class ActivoService:
         activo = obtener_activo(self.db, activo_id)
         if activo.tipo not in ("accion", "cedear"):
             raise BusinessError("Solo las acciones y los CEDEARs pagan dividendos.")
-        div = Dividendo(activo_id=activo.id, monto_por_unidad=monto_por_unidad,
-                        fecha_pago=fecha_pago or datetime.now(TZ_AR).date())
+        hoy = datetime.now(TZ_AR).date()
+        fecha_pago = fecha_pago or hoy
+        # Se acredita en el momento: una fecha futura no tendría sentido
+        if fecha_pago > hoy:
+            raise BusinessError("La fecha de pago no puede ser futura: el dividendo se acredita en el momento.",
+                                campo="fecha_pago")
+        # Doble clic o pedido repetido: el mismo dividendo (activo, día y monto) no se paga dos veces
+        if self.repo.dividendo_igual(activo.id, fecha_pago, monto_por_unidad):
+            raise ConflictError(f"Ese dividendo de {activo.ticker} ya se pagó el {fecha_pago:%d/%m/%Y}.")
+        div = Dividendo(activo_id=activo.id, monto_por_unidad=monto_por_unidad, fecha_pago=fecha_pago)
         self.repo.add_dividendo(div)
 
         cuentas = CuentaRepository(self.db)
@@ -103,7 +115,7 @@ class ActivoService:
     # ---------- HU12: rankings ----------
     def mas_operados(self, ahora: datetime, limite: int = 10) -> list[dict]:
         filas = OperacionRepository(self.db).volumen_por_activo(a_utc(ahora) - timedelta(days=7))
-        tc = tipo_cambio_mep(self.db) or Decimal("1")
+        tc = tipo_cambio_mep(self.db)
         ranking = []
         for activo, n_ops, unidades, monto in filas:
             monto = Decimal(monto or 0)
@@ -112,7 +124,8 @@ class ActivoService:
                 "moneda": activo.moneda, "operaciones": n_ops, "cantidad_operada": int(unidades or 0),
                 "volumen": q2(monto),
                 # Volumen comparable entre monedas: los USD se pasan a pesos al tipo de cambio MEP
-                "volumen_ars": q2(monto * (tc if activo.moneda == "USD" else 1)),
+                # Sin tipo de cambio no se puede pasar a pesos: queda sin dato en vez de sumar dólares como pesos
+                "volumen_ars": q2(monto * tc) if activo.moneda == "USD" and tc else (q2(monto) if activo.moneda == "ARS" else None),
             })
         ranking.sort(key=lambda r: (-r["volumen_ars"], r["ticker"]))
         return to_json(ranking[:limite])

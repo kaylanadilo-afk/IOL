@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.orm import Session
 
 from src.db.connection import get_db
+from src.utils.autorizacion import solo_admin
 from src.dtos.broker_dto import ActivoDTO, DividendoDTO
 from src.schemas.broker_schema import (CreateActivoSchema, CreateDividendoSchema, Moneda, TipoActivo,
                                        UpdateEstadoSchema, UpdatePrecioSchema)
@@ -17,7 +18,7 @@ dividendos_router = APIRouter(prefix="/dividendos", tags=["Activos (admin)"])
 
 # ---------- HU2: catálogo ----------
 @router.post("", response_model=ActivoDTO, status_code=status.HTTP_201_CREATED, tags=["Activos (admin)"])
-def alta_activo(payload: CreateActivoSchema, db: Session = Depends(get_db)):
+def alta_activo(payload: CreateActivoSchema, db: Session = Depends(get_db), _admin=Depends(solo_admin)):
     return ActivoService(db).crear(**payload.model_dump())
 
 
@@ -65,17 +66,17 @@ def ver_intradia(activo_id: int, fecha: date | None = None, db: Session = Depend
 # ---------- HU8: precio y suspensión ----------
 @router.patch("/{activo_id}/precio", response_model=ActivoDTO, tags=["Activos (admin)"])
 def actualizar_precio(activo_id: int, payload: UpdatePrecioSchema, db: Session = Depends(get_db),
-                      ahora: datetime = Depends(get_ahora)):
+                      ahora: datetime = Depends(get_ahora), _admin=Depends(solo_admin)):
     return ActivoService(db).actualizar_precio(activo_id, payload.precio, ahora)
 
 
 @router.patch("/{activo_id}/estado", response_model=ActivoDTO, tags=["Activos (admin)"],
               summary="Suspender (activo=false) o habilitar un activo")
-def actualizar_estado(activo_id: int, payload: UpdateEstadoSchema, db: Session = Depends(get_db)):
+def actualizar_estado(activo_id: int, payload: UpdateEstadoSchema, db: Session = Depends(get_db), _admin=Depends(solo_admin)):
     return ActivoService(db).actualizar_estado(activo_id, payload.activo)
 
 
 # ---------- HU9: dividendos ----------
 @dividendos_router.post("", response_model=DividendoDTO, status_code=status.HTTP_201_CREATED)
-def pagar_dividendo(payload: CreateDividendoSchema, db: Session = Depends(get_db)):
+def pagar_dividendo(payload: CreateDividendoSchema, db: Session = Depends(get_db), _admin=Depends(solo_admin)):
     return ActivoService(db).registrar_dividendo(payload.activo_id, payload.monto_por_unidad, payload.fecha_pago)

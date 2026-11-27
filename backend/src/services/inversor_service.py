@@ -12,7 +12,7 @@ from src.dtos.broker_dto import ActivoDTO, InversorDTO, PasswordCambiadaDTO, Ses
 from src.mappers.broker_mapper import to_activos, to_inversor
 from src.repositories.broker_repository import CuentaRepository, InversorRepository
 from src.services.activo_service import obtener_activo
-from src.utils import correo, seguridad
+from src.utils import correo, limites, seguridad
 from src.utils.errors import BusinessError, ConflictError, EmailNoVerificadoError, UnauthorizedError, no_encontrado
 
 MINUTOS_CODIGO = 15      # vigencia del código
@@ -23,6 +23,14 @@ MAX_INTENTOS = 5
 def _utc(d: datetime | None) -> datetime | None:
     """SQLite devuelve fechas sin zona horaria: se toman como UTC."""
     return d.replace(tzinfo=timezone.utc) if d and d.tzinfo is None else d
+
+
+def _ocultar_email(email: str) -> str:
+    """ana.perez@gmail.com -> a*******z@gmail.com (para mostrar a dónde se mandó el código)."""
+    usuario, _, dominio = email.partition("@")
+    if len(usuario) <= 2:
+        return f"{usuario[0]}*@{dominio}"
+    return f"{usuario[0]}{'*' * (len(usuario) - 2)}{usuario[-1]}@{dominio}"
 
 
 def verificacion_activada() -> bool:
@@ -50,17 +58,21 @@ class InversorService:
             raise ConflictError("Ya existe una cuenta con este correo", campo="email")
         if self.repo.find_by_cuit(cuit):
             raise ConflictError("Ya existe una cuenta con este CUIT", campo="cuit")
-        inv = self.repo.add(Inversor(email=email, nombre=nombre, cuit=cuit, perfil_riesgo=perfil_riesgo,
-                                     es_admin=es_admin, password_hash=seguridad.hashear(password),
-                                     email_verificado=es_admin or not verificacion_activada()))
-        siguiente = (self.cuentas.max_numero_comitente() or 100000) + 1
-        self.cuentas.add(Cuenta(inversor_id=inv.id, numero_comitente=siguiente,
-                                saldo_ars=Decimal("0"), saldo_usd=Decimal("0")))
         try:
+            inv = self.repo.add(Inversor(email=email, nombre=nombre, cuit=cuit, perfil_riesgo=perfil_riesgo,
+                                         es_admin=es_admin, password_hash=seguridad.hashear(password),
+                                         email_verificado=es_admin or not verificacion_activada()))
+            siguiente = (self.cuentas.max_numero_comitente() or 100000) + 1
+            self.cuentas.add(Cuenta(inversor_id=inv.id, numero_comitente=siguiente,
+                                    saldo_ars=Decimal("0"), saldo_usd=Decimal("0")))
             self.cuentas.flush()
-        except IntegrityError:  # carrera con otra alta simultánea
+        except IntegrityError:  # carrera con otra alta simultánea: se dice qué dato quedó repetido
             self.db.rollback()
-            raise ConflictError("No se pudo crear la cuenta, reintentá")
+            if self.repo.find_by_email(email):
+                raise ConflictError("Ya existe una cuenta con este correo", campo="email") from None
+            if self.repo.find_by_cuit(cuit):
+                raise ConflictError("Ya existe una cuenta con este CUIT", campo="cuit") from None
+            raise ConflictError("No se pudo crear la cuenta, reintentá") from None
         self.cuentas.refresh(inv)
         self.db.commit()
         if not inv.email_verificado:
@@ -78,10 +90,16 @@ class InversorService:
 
     # ---------- Contraseñas y sesión ----------
     def ingresar(self, email: str, password: str) -> SesionDTO:
-        inv = self.repo.find_by_email(email.strip().lower())
-        # Mismo mensaje si el email no existe o la contraseña es incorrecta: no revela qué cuentas hay
-        if not inv or not seguridad.verificar(password, inv.password_hash):
+        clave = email.strip().lower()
+        # Fuerza bruta: después de 5 errores seguidos la cuenta queda frenada un rato (aun con la clave correcta)
+        limites.LOGIN.verificar(clave)
+        inv = self.repo.find_by_email(clave)
+        # Mismo mensaje y mismo tiempo (scrypt se calcula igual) si el email no existe: no revela qué cuentas hay
+        ok = seguridad.verificar(password, inv.password_hash if inv else seguridad.HASH_FALSO)
+        if not inv or not ok:
+            limites.LOGIN.registrar(clave)
             raise UnauthorizedError("Email o contraseña incorrectos.")
+        limites.LOGIN.limpiar(clave)
         if not inv.email_verificado:
             # Si el código anterior venció, se manda uno nuevo
             if not inv.codigo_expira or _utc(inv.codigo_expira) < datetime.now(timezone.utc):
@@ -102,18 +120,23 @@ class InversorService:
         correo.despachar(inv.email, asunto, texto, html)
 
     def reenviar_codigo(self, email: str) -> dict:
-        inv = self.repo.find_by_email(email.strip().lower())
+        clave = email.strip().lower()
+        inv = self.repo.find_by_email(clave)
         # Misma respuesta si la cuenta no existe o ya está confirmada: no revela qué correos hay
         if inv and not inv.email_verificado:
             if inv.codigo_enviado:
                 pasaron = (datetime.now(timezone.utc) - _utc(inv.codigo_enviado)).total_seconds()
                 if pasaron < ESPERA_REENVIO:
                     return {"ok": True, "espera": int(ESPERA_REENVIO - pasaron) + 1}
+            limites.REENVIO.consumir(clave)  # hasta 5 correos por hora a la misma cuenta
             self._mandar_codigo(inv)
         return {"ok": True, "espera": ESPERA_REENVIO}
 
     def verificar_email(self, email: str, codigo: str) -> SesionDTO:
-        inv = self.repo.find_by_email(email.strip().lower())
+        clave = email.strip().lower()
+        # Además de los 5 intentos por código, 10 errores por hora aunque se pidan códigos nuevos
+        limites.CODIGO.verificar(clave)
+        inv = self.repo.find_by_email(clave)
         if not inv or inv.email_verificado or not inv.codigo_hash:
             raise BusinessError("El código no es válido. Pedí uno nuevo.", campo="codigo")
         if inv.codigo_intentos >= MAX_INTENTOS:
@@ -121,6 +144,7 @@ class InversorService:
         if inv.codigo_expira and _utc(inv.codigo_expira) < datetime.now(timezone.utc):
             raise BusinessError("El código venció. Pedí uno nuevo.", campo="codigo")
         if not secrets.compare_digest(inv.codigo_hash, seguridad.hash_codigo(inv.id, codigo.strip())):
+            limites.CODIGO.registrar(clave)
             inv.codigo_intentos += 1
             self.db.commit()
             quedan = MAX_INTENTOS - inv.codigo_intentos
@@ -139,14 +163,52 @@ class InversorService:
             raise UnauthorizedError("La sesión venció. Volvé a ingresar.")
         return to_inversor(inv)
 
-    def cambiar_password(self, inversor_id: int, actual: str, nueva: str) -> PasswordCambiadaDTO:
+    def solicitar_cambio_password(self, inversor_id: int, actual: str, nueva: str) -> dict:
+        """Paso 1: revisa la contraseña actual y manda un código al correo. La contraseña todavía no cambia."""
         inv = obtener_inversor(self.db, inversor_id)
+        clave = str(inversor_id)
+        limites.CAMBIO_PASSWORD.verificar(clave)
         if not seguridad.verificar(actual, inv.password_hash):
-            raise UnauthorizedError("La contraseña actual no es correcta.")
+            limites.CAMBIO_PASSWORD.registrar(clave)
+            raise UnauthorizedError("La contraseña actual no es correcta.", campo="actual")
         if actual == nueva:
-            raise BusinessError("La contraseña nueva tiene que ser distinta de la actual.")
-        inv.password_hash = seguridad.hashear(nueva)
+            raise BusinessError("La contraseña nueva tiene que ser distinta de la actual.", campo="nueva")
+        limites.REENVIO.consumir(f"pwd:{clave}")  # hasta 5 correos por hora
+        codigo = f"{secrets.randbelow(10**6):06d}"
+        inv.pwd_nueva_hash = seguridad.hashear(nueva)
+        inv.pwd_codigo_hash = seguridad.hash_codigo(inv.id, "pwd:" + codigo)
+        inv.pwd_codigo_expira = datetime.now(timezone.utc) + timedelta(minutes=MINUTOS_CODIGO)
+        inv.pwd_intentos = 0
         self.db.commit()
+        asunto, texto, html = correo.mail_cambio_password(inv.nombre.split(" ")[0], codigo, MINUTOS_CODIGO)
+        correo.despachar(inv.email, asunto, texto, html)
+        return {"pendiente": True, "email": _ocultar_email(inv.email), "minutos": MINUTOS_CODIGO}
+
+    def confirmar_cambio_password(self, inversor_id: int, codigo: str) -> PasswordCambiadaDTO:
+        """Paso 2: con el código del correo se aplica la contraseña nueva y se cierran las otras sesiones."""
+        inv = obtener_inversor(self.db, inversor_id)
+        clave = f"pwd:{inversor_id}"
+        limites.CODIGO.verificar(clave)
+        if not inv.pwd_codigo_hash or not inv.pwd_nueva_hash:
+            raise BusinessError("No hay un cambio de contraseña pendiente. Empezá de nuevo.", campo="codigo")
+        if inv.pwd_intentos >= MAX_INTENTOS:
+            raise BusinessError("Superaste los intentos. Pedí un código nuevo.", campo="codigo")
+        if inv.pwd_codigo_expira and _utc(inv.pwd_codigo_expira) < datetime.now(timezone.utc):
+            raise BusinessError("El código venció. Pedí uno nuevo.", campo="codigo")
+        if not secrets.compare_digest(inv.pwd_codigo_hash, seguridad.hash_codigo(inv.id, "pwd:" + codigo.strip())):
+            limites.CODIGO.registrar(clave)
+            inv.pwd_intentos += 1
+            self.db.commit()
+            quedan = MAX_INTENTOS - inv.pwd_intentos
+            raise BusinessError("El código no es correcto." + (f" Te quedan {quedan} intentos." if quedan else " Pedí uno nuevo."),
+                                campo="codigo")
+        inv.password_hash = inv.pwd_nueva_hash
+        inv.pwd_nueva_hash = inv.pwd_codigo_hash = inv.pwd_codigo_expira = None
+        inv.pwd_intentos = 0
+        self.db.commit()
+        limites.CAMBIO_PASSWORD.limpiar(str(inversor_id))
+        asunto, texto, html = correo.mail_password_cambiada(inv.nombre.split(" ")[0])
+        correo.despachar(inv.email, asunto, texto, html)
         # Las sesiones abiertas con la contraseña anterior dejan de valer; esta sigue con un token nuevo
         return PasswordCambiadaDTO(token=seguridad.crear_token(inv.id, inv.password_hash))
 

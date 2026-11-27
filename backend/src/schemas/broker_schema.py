@@ -16,9 +16,14 @@ TipoOperacion = Literal["compra", "venta"]
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
+MAXIMO = Decimal("1000000000000")  # un billón: mucho más que cualquier monto real, y entra en NUMERIC(18, 2)
+
+
 def _positivo(v: Decimal, campo: str, decimales: int) -> Decimal:
     if v is None or v <= 0:
         raise ValueError(f"{campo} tiene que ser mayor a 0")
+    if v > MAXIMO:
+        raise ValueError(f"{campo} es demasiado grande (máximo 1.000.000.000.000)")
     if v.as_tuple().exponent < -decimales:
         raise ValueError(f"{campo} admite hasta {decimales} decimales")
     return v
@@ -82,6 +87,18 @@ class CambiarPasswordSchema(BaseModel):
     @classmethod
     def _nueva(cls, v: str) -> str:
         return validar_password(v)
+
+
+class ConfirmarPasswordSchema(BaseModel):
+    codigo: str
+
+    @field_validator("codigo")
+    @classmethod
+    def _codigo(cls, v: str) -> str:
+        v = v.strip()
+        if not re.fullmatch(r"\d{6}", v):
+            raise ValueError("El código tiene 6 dígitos")
+        return v
 
 
 # ---------- Activos ----------

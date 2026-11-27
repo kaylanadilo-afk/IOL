@@ -3,6 +3,7 @@ import os
 from datetime import datetime, time, timedelta, timezone
 from decimal import ROUND_HALF_UP, Decimal
 
+from src.utils.feriados import es_feriado
 from src.utils.errors import BusinessError
 
 COMISION = Decimal("0.005")  # 0,5 % del monto operado
@@ -40,8 +41,10 @@ def mercado_siempre_abierto() -> bool:
 
 def estado_mercado(ahora: datetime) -> dict:
     local = ahora.astimezone(TZ_AR)
-    en_horario = local.weekday() < 5 and APERTURA <= local.time() < CIERRE
+    feriado = es_feriado(local.date())
+    en_horario = local.weekday() < 5 and not feriado and APERTURA <= local.time() < CIERRE
     return {
+        "feriado": feriado,
         "abierto": en_horario or mercado_siempre_abierto(),
         "en_horario": en_horario,
         "modo_demo": mercado_siempre_abierto(),
@@ -52,7 +55,9 @@ def estado_mercado(ahora: datetime) -> dict:
 
 def validar_horario(ahora: datetime) -> None:
     if not estado_mercado(ahora)["abierto"]:
-        local = ahora.astimezone(TZ_AR).strftime("%A %d/%m %H:%M")
+        local = ahora.astimezone(TZ_AR)
+        dia = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")[local.weekday()]
+        local = f"{dia} {local:%d/%m %H:%M}"
         raise BusinessError(
-            f"Mercado cerrado: solo se opera de lunes a viernes de 11:00 a 17:00 (ahora: {local})."
+            f"Mercado cerrado: solo se opera de lunes a viernes de 11:00 a 17:00, salvo feriados (ahora: {local})."
         )
