@@ -2,12 +2,14 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { api } from "@/lib/api";
 import { cls, money, num, pct, signed, TIPO_LBL } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
 import { useMe } from "@/context/SessionContext";
-import { Donut } from "@/components/charts";
-import { composicionParts, PortfolioChartCard } from "@/components/cards";
+import { PieChart } from "@/components/charts";
+import { distribucion, PortfolioChartCard } from "@/components/cards";
+import type { Cartera } from "@/lib/types";
 import { ErrorCard, Head, Loading } from "@/components/ui";
 
 const ICO = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
@@ -37,11 +39,7 @@ export default function CarteraPage() {
       {/* Primero, cómo viene el valor de la cartera */}
       <div className="home-grid">
         <PortfolioChartCard title="Valor de la cartera" />
-        <div className="card">
-          <div className="ctitle"><h2>Composición por tipo</h2></div>
-          <Donut parts={composicionParts(cart)} />
-          <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>Los activos en dólares se pasan a pesos al dólar MEP.</p>
-        </div>
+        <DistribucionCartera cart={cart} />
       </div>
 
       <div className="kpis">
@@ -104,5 +102,48 @@ export default function CarteraPage() {
         </table>
       </div>
     </>
+  );
+}
+
+/* ===================== DISTRIBUCIÓN POR TIPO (torta) ===================== */
+function DistribucionCartera({ cart }: { cart: Cartera }) {
+  const [elegida, setElegida] = useState<string | null>(null);
+  const cats = distribucion(cart);
+  const total = cats.reduce((s, c) => s + c.value, 0);
+  const sel = cats.find((c) => c.key === elegida) ?? null;
+  const porc = (v: number) => `${((v / total) * 100).toFixed(1).replace(".", ",")}%`;
+  return (
+    <div className="card">
+      <div className="ctitle"><h2>Distribución por tipo</h2></div>
+      {total > 0 ? (
+        <>
+          <div className="pie-wrap">
+            <PieChart parts={cats} selected={elegida} onSelect={setElegida} aria="Distribución del valor de la cartera por tipo de activo" />
+            <div className="pie-legend">
+              {cats.map((c) => (
+                <button key={c.key} type="button" className={`pie-leg${elegida === c.key ? " on" : ""}`}
+                  aria-pressed={elegida === c.key} onClick={() => setElegida(elegida === c.key ? null : c.key)}>
+                  <span className="sw" style={{ background: c.color }} />{c.label}<b>{porc(c.value)}</b>
+                </button>
+              ))}
+            </div>
+          </div>
+          {sel ? (
+            <div className="pie-detalle">
+              <div className="pie-detalle-head"><b>{sel.label}</b><span className="muted">{money(sel.value, "ARS")} · {porc(sel.value)} del total</span></div>
+              {sel.items.sort((x, y) => y.valorArs - x.valorArs).map((i) => (
+                <div key={i.clave} className="list-row">
+                  <span><b>{i.titulo}</b><div className="sname">{i.detalle}</div></span>
+                  <span className="r"><b>{i.nativo}</b><div className="sname">{porc(i.valorArs)}</div></span>
+                </div>
+              ))}
+            </div>
+          ) : <p className="muted pie-ayuda">Tocá una categoría para ver qué activos la componen.</p>}
+          <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>
+            Valor de cada tipo sobre el total (incluye el dinero disponible). Los dólares se pasan a pesos al MEP{cart.tipo_cambio_mep ? ` de ${money(cart.tipo_cambio_mep, "ARS")}` : ""}.
+          </p>
+        </>
+      ) : <div className="empty">Todavía no tenés inversiones ni saldo.</div>}
+    </div>
   );
 }

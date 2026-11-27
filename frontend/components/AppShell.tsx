@@ -8,19 +8,25 @@ import { useSession } from "@/context/SessionContext";
 import { useUI } from "@/context/UIContext";
 import { textoMercado } from "./ui";
 import {
-  IcoAdmin, IcoCartera, IcoInicio, IcoMep, IcoMercado, IcoMovimientos, IcoOperaciones, IcoRankings, IcoToggle,
-  TabCartera, TabInicio, TabMas, TabMercado,
+  IcoAdmin, IcoAlerta, IcoCartera, IcoClave, IcoComprar, IcoIngresar, IcoInicio, IcoLuna, IcoMep, IcoMercado,
+  IcoOperaciones, IcoPerfil, IcoRetirar, IcoSalir, IcoToggle, IcoVender, TabCartera, TabInicio, TabMas, TabMercado,
 } from "./icons";
 
+// Movimientos se abre desde los botones de dinero del inicio (Ingresar, Retirar, Ver movimientos)
 const NAV = [
   { href: "/", label: "Inicio", Ico: IcoInicio },
   { href: "/mercado", label: "Mercado", Ico: IcoMercado },
   { href: "/cartera", label: "Mi cartera", Ico: IcoCartera },
+  { href: "/alertas", label: "Alertas de precios", Ico: IcoAlerta },
   { href: "/operaciones", label: "Operaciones", Ico: IcoOperaciones },
-  { href: "/movimientos", label: "Movimientos", Ico: IcoMovimientos },
   { href: "/mep", label: "Dólar MEP", Ico: IcoMep },
-  { href: "/rankings", label: "Rankings", Ico: IcoRankings },
 ];
+
+/** Cantidad de avisos sin leer sobre un ícono. */
+export function Badge({ n }: { n: number }) {
+  if (!n) return null;
+  return <span className="badge" aria-label={`${n} sin leer`}>{n > 9 ? "9+" : n}</span>;
+}
 
 /** Sección del menú a la que pertenece una ruta (el detalle de un activo marca "Mercado"). */
 function seccion(path: string): string {
@@ -29,7 +35,7 @@ function seccion(path: string): string {
 }
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
-  const { estado, me, mercado, salir, reloadAll } = useSession();
+  const { estado, me, mercado, salir, reloadAll, avisos } = useSession();
   const { theme, setTheme, toggleMenu, menuOpen, sheetOpen, setSheetOpen, vibrar } = useUI();
   const router = useRouter();
   const path = usePathname();
@@ -83,7 +89,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <nav className="nav">
           {NAV.map(({ href, label, Ico }) => (
             <Link key={href} href={href} className={`nav-item${actual === href ? " active" : ""}`} data-tip={label} aria-label={label}>
-              <Ico /><span className="lbl">{label}</span>
+              <span className="ico-wrap"><Ico />{href === "/alertas" && <Badge n={avisos} />}</span><span className="lbl">{label}</span>
             </Link>
           ))}
           <div className="sep admin-only" />
@@ -104,13 +110,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             {/* Submenú del perfil: aparece encima al pasar el mouse */}
             <div className="profile-pop" role="menu" aria-label="Opciones de la cuenta">
               <div className="pp-head"><span className="avatar">{ini}</span><div style={{ minWidth: 0 }}><b>{me.nombre}</b><small>{me.email}</small></div></div>
-              <Link href="/perfil" className="pp-item" role="menuitem"><span className="mi">◉</span>Ver mi perfil</Link>
-              <Link href="/perfil/configuracion#password" className="pp-item" role="menuitem"><span className="mi">⚿</span>Cambiar contraseña</Link>
+              <Link href="/perfil" className="pp-item" role="menuitem"><span className="mi"><IcoPerfil /></span>Ver mi perfil</Link>
+              <Link href="/perfil/configuracion#password" className="pp-item" role="menuitem"><span className="mi"><IcoClave /></span>Cambiar contraseña</Link>
               <button type="button" className="pp-item" role="menuitem" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
-                <span className="mi">◐</span>Modo oscuro<span className="switch" aria-hidden="true" />
+                <span className="mi"><IcoLuna /></span>Modo oscuro<span className="switch" aria-hidden="true" />
               </button>
-              <Link href="/admin" className="pp-item admin-only" role="menuitem"><span className="mi">⚙</span>Administración</Link>
-              <button type="button" className="pp-item danger" role="menuitem" onClick={logout}><span className="mi">⏻</span>Cerrar sesión</button>
+              <Link href="/admin" className="pp-item admin-only" role="menuitem"><span className="mi"><IcoAdmin /></span>Administración</Link>
+              <button type="button" className="pp-item danger" role="menuitem" onClick={logout}><span className="mi"><IcoSalir /></span>Cerrar sesión</button>
             </div>
           </div>
         </div>
@@ -135,12 +141,13 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         <div className="grabber" />
         <h3>¿Qué querés hacer?</h3>
         <div className="actions-grid">
-          {[
-            ["/mercado", "#0a9f66", "↗", "Comprar"], ["/cartera", "#d64545", "↘", "Vender"], ["/mep", "#1663a8", "$", "Dólar MEP"],
-            ["/movimientos", "#8b5cf6", "＋", "Depositar"], ["/movimientos", "#f08c2e", "−", "Extraer"], ["/operaciones", "#0f3b6e", "☰", "Historial"],
-          ].map(([href, color, ico, label]) => (
+          {([
+            ["/mercado", "#0a9f66", IcoComprar, "Comprar"], ["/cartera", "#d64545", IcoVender, "Vender"], ["/mep", "#1663a8", IcoMep, "Dólar MEP"],
+            ["/movimientos?accion=ingresar", "#0a8f5c", IcoIngresar, "Ingresar dinero"], ["/movimientos?accion=retirar", "#f08c2e", IcoRetirar, "Retirar dinero"],
+            ["/alertas", "#8b5cf6", IcoAlerta, "Alertas"],
+          ] as const).map(([href, color, Ico, label]) => (
             <Link key={label} href={href} className="action" onClick={() => setSheetOpen(false)}>
-              <span className="ai" style={{ background: color }}>{ico}</span>{label}
+              <span className="ai" style={{ background: color }}><Ico /></span>{label}
             </Link>
           ))}
         </div>

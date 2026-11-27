@@ -2,6 +2,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { api, guardarToken, leerToken } from "@/lib/api";
+import { useUI } from "@/context/UIContext";
 import { limpiarCache } from "@/lib/useAsync";
 import type { Activo, EstadoMercado, Inversor, Sesion } from "@/lib/types";
 
@@ -18,6 +19,9 @@ interface SessionValue {
   /** Cambia cuando el usuario pide recargar todo (deslizar hacia abajo, Reintentar…). */
   reloadKey: number;
   preciosReales: boolean;
+  /** Avisos de alertas de precio sin leer (se revisan cada 30 s). */
+  avisos: number;
+  refreshAvisos: () => Promise<void>;
   cuentaId: number;
   ingresar: (s: Sesion) => Promise<void>;
   salir: () => void;
@@ -40,6 +44,21 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
   const [mercado, setMercado] = useState<EstadoMercado | null>(null);
   const [liveTick, setLiveTick] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const [avisos, setAvisos] = useState(0);
+  const avisosRef = useRef<number | null>(null);
+  const { toast } = useUI();
+
+  // Si llegó un aviso nuevo mientras la app está abierta, se muestra también como mensaje
+  const refreshAvisos = useCallback(async () => {
+    try {
+      const r = await api.avisos();
+      if (avisosRef.current != null && r.no_leidas > avisosRef.current && r.items[0]) toast(r.items[0].titulo);
+      avisosRef.current = r.no_leidas;
+      setAvisos(r.no_leidas);
+    } catch {
+      /* sin avisos por ahora: se reintenta en el próximo ciclo */
+    }
+  }, [toast]);
   const meRef = useRef<Inversor | null>(null);
   useEffect(() => {
     meRef.current = me;
@@ -63,11 +82,14 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     setMe(s.inversor);
     await refreshBase();
     setEstado("listo");
-  }, [refreshBase]);
+    refreshAvisos();
+  }, [refreshBase, refreshAvisos]);
 
   const salir = useCallback(() => {
     guardarToken(null);
     limpiarCache();
+    avisosRef.current = null;
+    setAvisos(0);
     meRef.current = null;
     setMe(null);
     setEstado("anonimo");
@@ -96,6 +118,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     const id = setInterval(async () => {
       if (document.hidden) return;
       try {
+        refreshAvisos();
         const m = await api.mercado();
         setMercado(m);
         if (m.precios?.modo !== "reales") return;
@@ -106,16 +129,17 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       }
     }, 30000);
     return () => clearInterval(id);
-  }, [estado]);
+  }, [estado, refreshAvisos]);
 
   const value = useMemo<SessionValue>(() => ({
     estado, me, activos, favs, mercado, liveTick, reloadKey,
     preciosReales: mercado?.precios?.modo === "reales",
+    avisos, refreshAvisos,
     cuentaId: me?.cuenta?.id ?? 0,
     ingresar, salir, refreshBase, reloadAll, setMe, setFavs, setMercado,
     activoById: (id) => activos.find((a) => a.id === id),
     activoByTicker: (t) => activos.find((a) => a.ticker === t),
-  }), [estado, me, activos, favs, mercado, liveTick, reloadKey, ingresar, salir, refreshBase, reloadAll]);
+  }), [estado, me, activos, favs, mercado, liveTick, reloadKey, avisos, refreshAvisos, ingresar, salir, refreshBase, reloadAll]);
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }

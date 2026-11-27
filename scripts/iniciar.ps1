@@ -71,6 +71,8 @@ try {
         $ultimo = Get-ChildItem $fuentes -Recurse -File | Sort-Object LastWriteTime -Descending | Select-Object -First 1
         if (-not (Test-Path $build) -or $ultimo.LastWriteTime -gt (Get-Item $build).LastWriteTime) {
             Write-Host "  Hay cambios: compilando la pagina (tarda menos de un minuto)..."
+            # Tipos viejos que deja 'npm run dev' pueden frenar la compilacion: se regeneran solos
+            Remove-Item (Join-Path $front ".next\dev") -Recurse -Force -ErrorAction SilentlyContinue
             & npm.cmd run build
             if ($LASTEXITCODE -ne 0) { throw "La compilacion fallo: revisa los errores de arriba." }
         } else {

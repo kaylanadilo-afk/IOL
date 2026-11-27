@@ -35,12 +35,54 @@ export function ErrorCard({ message, onRetry }: { message: string; onRetry?: () 
 
 export function RiskDots({ n }: { n: number }) {
   return (
-    <>
-      <span className="risk" title={`Nivel de riesgo ${n} de 5`}>
-        {[1, 2, 3, 4, 5].map((i) => <i key={i} className={i <= n ? "on" : ""} />)}
-      </span>{" "}
-      <small className="muted">{n}</small>
-    </>
+    <span className="risk" role="img" aria-label={`Riesgo ${n} de 5`} title={`Riesgo ${n} de 5`}>
+      {[1, 2, 3, 4, 5].map((i) => <i key={i} className={i <= n ? "on" : ""} />)}
+    </span>
+  );
+}
+
+/** Cuándo llegaron los últimos precios y de dónde salen (en vivo, con demora o cargados a mano). */
+export function FuentePrecios() {
+  const { mercado } = useSession();
+  const p = mercado?.precios;
+  if (!p) return null;
+  if (p.modo !== "reales") return <p className="fuente">Precios cargados manualmente por la administración (no son cotizaciones en vivo).</p>;
+  const cuando = p.ultima_sincronizacion
+    ? new Date(p.ultima_sincronizacion).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23", timeZone: "America/Argentina/Buenos_Aires" })
+    : null;
+  return (
+    <p className={`fuente${p.error ? " warn" : ""}`}>
+      <span className={`dot${p.error ? "" : " on"}`} />
+      {p.error
+        ? <>No se pudieron actualizar los precios{cuando ? ` desde las ${cuando}` : ""}: se muestran los últimos disponibles.</>
+        : <>Cotizaciones de BYMA vía data912 · actualizadas a las {cuando ?? "—"} · se refrescan cada {p.intervalo_segundos ?? 60} s y pueden tener demora respecto del mercado.</>}
+    </p>
+  );
+}
+
+/** Controles de página: anterior, números y siguiente. */
+export function Paginacion({ pagina, paginas, total, porPagina, onCambio }: {
+  pagina: number; paginas: number; total: number; porPagina: number; onCambio: (p: number) => void;
+}) {
+  if (paginas <= 1) return null;
+  const desde = (pagina - 1) * porPagina + 1, hasta = Math.min(pagina * porPagina, total);
+  const numeros = Array.from({ length: paginas }, (_, i) => i + 1)
+    .filter((n) => n === 1 || n === paginas || Math.abs(n - pagina) <= 1);
+  return (
+    <nav className="paginacion" aria-label="Páginas">
+      <span className="muted">{desde}–{hasta} de {total}</span>
+      <div className="pag-btns">
+        <button type="button" className="btn btn-ghost btn-sm" disabled={pagina === 1} onClick={() => onCambio(pagina - 1)}>Anterior</button>
+        {numeros.map((n, i) => (
+          <span key={n} className="pag-n">
+            {i > 0 && n - numeros[i - 1] > 1 && <span className="muted" aria-hidden="true">…</span>}
+            <button type="button" className={`btn btn-sm ${n === pagina ? "btn-primary" : "btn-ghost"}`} aria-current={n === pagina ? "page" : undefined}
+              aria-label={`Página ${n}`} onClick={() => onCambio(n)}>{n}</button>
+          </span>
+        ))}
+        <button type="button" className="btn btn-ghost btn-sm" disabled={pagina === paginas} onClick={() => onCambio(pagina + 1)}>Siguiente</button>
+      </div>
+    </nav>
   );
 }
 

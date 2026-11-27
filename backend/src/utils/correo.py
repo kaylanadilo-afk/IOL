@@ -81,3 +81,28 @@ def mail_codigo(nombre: str, codigo: str, minutos: int) -> tuple[str, str, str]:
 <tr><td style="padding:0 28px 28px;font-size:13px;color:#667085;line-height:1.5">Vence en {minutos} minutos. Si no creaste una cuenta en Zeno Investments, ignorá este mensaje.</td></tr>
 </table></td></tr></table></body></html>"""
     return asunto, texto, html
+
+
+def mail_alerta(nombre: str, titulo: str, mensaje: str, ticker: str, nombre_activo: str, precio: str, referencia: str,
+                variacion: str, condicion: str) -> tuple[str, str, str]:
+    """Asunto, texto y HTML del correo de una alerta de precio."""
+    aviso = "Esta alerta es informativa: Zeno Investments no compra ni vende de forma automática."
+    texto = "\n".join([
+        f"Hola {nombre}:", "", mensaje, "", f"{ticker} - {nombre_activo}", f"Cotización actual: {precio}",
+        f"Precio de referencia: {referencia}", f"Variación: {variacion}", f"Condición: {condicion}", "", aviso,
+    ])
+    fila = ('<tr><td style="padding:9px 0;color:#667085;font-size:14px;border-top:1px solid #E2E6E0">{}</td>'
+            '<td align="right" style="padding:9px 0;font-size:14px;font-weight:bold;border-top:1px solid #E2E6E0">{}</td></tr>')
+    filas = "".join(fila.format(k, v) for k, v in (("Cotización actual", precio), ("Precio de referencia", referencia),
+                                                    ("Variación", variacion), ("Condición", condicion)))
+    html = f"""<!doctype html><html><body style="margin:0;background:#F4F6F3;font-family:Arial,Helvetica,sans-serif;color:#0E1A2B">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr><td align="center" style="padding:32px 16px">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:500px;background:#fff;border:1px solid #E2E6E0;border-radius:16px">
+<tr><td style="padding:26px 28px 6px"><b style="font-size:20px">Zeno</b> <span style="font-size:20px;color:#667085">Investments</span></td></tr>
+<tr><td style="padding:10px 28px 0"><div style="font-size:12px;font-weight:bold;letter-spacing:1px;color:#0A8F5C;text-transform:uppercase">Alerta de precio</div>
+<div style="font-size:22px;font-weight:bold;margin-top:6px">{ticker} <span style="font-size:15px;font-weight:normal;color:#667085">{nombre_activo}</span></div></td></tr>
+<tr><td style="padding:14px 28px 4px;font-size:15px;line-height:1.55">Hola {nombre}: {mensaje}</td></tr>
+<tr><td style="padding:10px 28px 6px"><table role="presentation" width="100%" cellpadding="0" cellspacing="0">{filas}</table></td></tr>
+<tr><td style="padding:12px 28px 26px;font-size:12px;color:#667085;line-height:1.5">{aviso} Revisá la información antes de operar.</td></tr>
+</table></td></tr></table></body></html>"""
+    return titulo, texto, html

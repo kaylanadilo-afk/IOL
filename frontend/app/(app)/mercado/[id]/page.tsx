@@ -12,7 +12,8 @@ import { useAsync } from "@/lib/useAsync";
 import { useMe } from "@/context/SessionContext";
 import { useUI } from "@/context/UIContext";
 import { LineChart, type ChartPoint } from "@/components/charts";
-import { ErrorCard, EstadoPill, Loading, RiskDots, StarButton, SummaryRows, VarPill } from "@/components/ui";
+import { ErrorCard, EstadoPill, FuentePrecios, Loading, RiskDots, StarButton, SummaryRows, VarPill } from "@/components/ui";
+import { IcoAlerta } from "@/components/icons";
 
 type Lado = "buy" | "sell";
 const RANGOS: [string, string][] = [["hoy", "Hoy"], ["7", "1S"], ["30", "1M"], ["90", "3M"], ["180", "6M"], ["365", "1A"]];
@@ -91,14 +92,17 @@ export default function ActivoPage() {
 
   return (
     <>
-      <div className="head"><div><Link href="/mercado" className="btn btn-ghost btn-sm">← Volver al mercado</Link></div></div>
+      <div className="head">
+        <div><Link href="/mercado" className="btn btn-ghost btn-sm">← Volver al mercado</Link></div>
+        <Link href={`/alertas?activo=${a.id}`} className="btn btn-ghost btn-sm"><IcoAlerta />Crear alerta de precio</Link>
+      </div>
       <div className="grid gtrade">
         <div className="grid" style={{ alignContent: "start" }}>
           <div className="card">
             <div className="asset-head">
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}><StarButton a={a} /><h1 style={{ margin: 0, fontSize: 24 }}>{a.ticker}</h1></div>
-                <div className="muted">{a.nombre} <span className="pill neutral">{TIPO_LBL[a.tipo]} en {a.moneda === "ARS" ? "pesos" : "dólares"}</span></div>
+                <div className="muted asset-sub">{a.nombre} <span className="pill neutral">{TIPO_LBL[a.tipo]} en {a.moneda === "ARS" ? "pesos" : "dólares"}</span> <RiskDots n={a.nivel_riesgo} /></div>
               </div>
               <div style={{ textAlign: "right" }}>
                 <div className="big-price">{money(a.precio_actual, a.moneda)}</div>
@@ -107,12 +111,19 @@ export default function ActivoPage() {
               </div>
             </div>
             <PriceChart a={a} liveTick={liveTick} reloadKey={reloadKey + nonce} preciosReales={m.precios?.modo === "reales"} />
-            <div className="stats">
-              <div className="stat"><small>Tipo</small><b>{TIPO_LBL[a.tipo]}</b></div>
-              <div className="stat"><small>Moneda</small><b>{a.moneda}</b></div>
-              <div className="stat"><small>Nivel de riesgo</small><b><RiskDots n={a.nivel_riesgo} /></b></div>
-              <div className="stat"><small>Tu perfil permite</small><b>hasta {RIESGO_MAX[me.perfil_riesgo]}</b></div>
+            <div className="table-wrap">
+              <table className="data-table">
+                <thead><tr><th>Tipo</th><th>Moneda</th><th>Tu perfil ({me.perfil_riesgo}) permite</th><th>Estado</th></tr></thead>
+                <tbody>
+                  <tr>
+                    <td>{TIPO_LBL[a.tipo]}</td><td>{a.moneda === "ARS" ? "Pesos (ARS)" : "Dólares (USD)"}</td>
+                    <td><RiskDots n={RIESGO_MAX[me.perfil_riesgo]} /></td>
+                    <td><EstadoPill a={a} /></td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
+            <FuentePrecios />
           </div>
           <div className="card">
             <div className="ctitle"><h2>Tu posición</h2></div>
@@ -168,8 +179,20 @@ export default function ActivoPage() {
 }
 
 /* ===================== GRÁFICO DE PRECIOS ===================== */
-function statBox(lbl: string, val: React.ReactNode, klass = "") {
-  return <div className="stat" key={lbl}><small>{lbl}</small><b className={klass}>{val}</b></div>;
+type Celda = [string, React.ReactNode, string?];
+
+/** Datos del período del gráfico en una tabla de una fila (encabezado + valores). */
+function TablaGrafico({ celdas }: { celdas: (Celda | false | null)[] }) {
+  const cols = celdas.filter(Boolean) as Celda[];
+  if (!cols.length) return null;
+  return (
+    <div className="table-wrap">
+      <table className="data-table">
+        <thead><tr>{cols.map(([k]) => <th key={k}>{k}</th>)}</tr></thead>
+        <tbody><tr>{cols.map(([k, v, klass]) => <td key={k} className={klass}>{v}</td>)}</tr></tbody>
+      </table>
+    </div>
+  );
 }
 
 function PriceChart({ a, liveTick, reloadKey, preciosReales }: { a: Activo; liveTick: number; reloadKey: number; preciosReales: boolean }) {
@@ -186,7 +209,7 @@ function PriceChart({ a, liveTick, reloadKey, preciosReales }: { a: Activo; live
 
   let pts: ChartPoint[] | null = null;
   let opt: Parameters<typeof LineChart>[0]["opt"] = { aria: "", vacio: "" };
-  let stats: React.ReactNode = null;
+  let celdas: (Celda | false | null)[] = [];
   let dias: string[] = [];
   let fechaDia: string | null = null;
 
@@ -208,12 +231,12 @@ function PriceChart({ a, liveTick, reloadKey, preciosReales }: { a: Activo; live
         : "Sin datos intradiarios. Activá los precios reales (PRECIOS_REALES=1) o cambiá el precio desde Administración.",
     };
     if (d.puntos.length && d.fecha) {
-      stats = [
-        statBox(rango === "hoy" && d.fecha === hoyAR() ? "Hoy" : "Día", diaCorto(d.fecha)),
-        statBox("Apertura", money(d.apertura, m)), statBox("Máximo", money(d.maximo, m)), statBox("Mínimo", money(d.minimo, m)),
-        d.fecha === hoyAR() || d.cierre == null ? statBox("Último", money(d.ultimo, m)) : statBox("Cierre", money(d.cierre, m)),
-        d.cierre_anterior != null && statBox("Cierre anterior", money(d.cierre_anterior, m)),
-        d.variacion_pct != null && statBox("Variación", pct(d.variacion_pct), cls(d.variacion_pct)),
+      celdas = [
+        [rango === "hoy" && d.fecha === hoyAR() ? "Hoy" : "Día", diaCorto(d.fecha)],
+        ["Apertura", money(d.apertura, m)], ["Máximo", money(d.maximo, m)], ["Mínimo", money(d.minimo, m)],
+        d.fecha === hoyAR() || d.cierre == null ? ["Último", money(d.ultimo, m)] : ["Cierre", money(d.cierre, m)],
+        d.cierre_anterior != null && ["Cierre anterior", money(d.cierre_anterior, m)],
+        d.variacion_pct != null && ["Variación", pct(d.variacion_pct), cls(d.variacion_pct)],
       ];
     }
   } else if (data && !intradia && "cierres" in data) {
@@ -232,11 +255,11 @@ function PriceChart({ a, liveTick, reloadKey, preciosReales }: { a: Activo; live
     opt = { xTicks: ticks, aria: `Cierres diarios de ${a.ticker}`, vacio: "Todavía no hay cierres guardados para este período." };
     const c = d.cierres;
     if (c.length) {
-      stats = [
-        statBox("Período", `${diaCorto(c[0].fecha)} → ${diaCorto(c[c.length - 1].fecha)}`),
-        statBox("Ruedas", c.length), statBox("Máximo", money(d.maximo, m)), statBox("Mínimo", money(d.minimo, m)),
-        statBox("Último cierre", money(c[c.length - 1].cierre, m)),
-        d.variacion_pct != null && statBox("Variación", pct(d.variacion_pct), cls(d.variacion_pct)),
+      celdas = [
+        ["Período", `${diaCorto(c[0].fecha)} → ${diaCorto(c[c.length - 1].fecha)}`],
+        ["Ruedas", c.length], ["Máximo", money(d.maximo, m)], ["Mínimo", money(d.minimo, m)],
+        ["Último cierre", money(c[c.length - 1].cierre, m)],
+        d.variacion_pct != null && ["Variación", pct(d.variacion_pct), cls(d.variacion_pct)],
       ];
     }
   }
@@ -256,7 +279,7 @@ function PriceChart({ a, liveTick, reloadKey, preciosReales }: { a: Activo; live
         </select>
       </div>
       {error ? <div className="chart"><div className="msg">{error}</div></div> : <LineChart id="assetChart" pts={data ? pts : null} opt={opt} />}
-      <div className="chart-stats">{fechaDia !== undefined && stats}</div>
+      {fechaDia !== undefined && <TablaGrafico celdas={celdas} />}
     </>
   );
 }

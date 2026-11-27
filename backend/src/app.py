@@ -13,7 +13,7 @@ from src.config.env import settings
 from src.db import migraciones
 from src.db.connection import Base, engine
 from src.middlewares.error_middleware import app_error_handler, integrity_error_handler, validation_error_handler
-from src.routers import (activos_router, auth_router, conductores_router, cuentas_router, inversores_router,
+from src.routers import (activos_router, alertas_router, auth_router, conductores_router, cuentas_router, inversores_router,
                          mercado_router, panel_router, pasajero_router, registros_router, user_router)
 from src.services import precios_service
 from src.utils.errors import AppError
@@ -62,6 +62,8 @@ app.include_router(cuentas_router.router, prefix="/api")
 for r in registros_router.ROUTERS:
     app.include_router(r, prefix="/api")
 app.include_router(panel_router.router, prefix="/api")
+app.include_router(alertas_router.router, prefix="/api")
+app.include_router(alertas_router.notificaciones, prefix="/api")
 
 
 @app.get("/health", tags=["Estado"], summary="Revisa que la API y la base de datos respondan")

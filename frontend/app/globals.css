@@ -483,6 +483,137 @@ tbody tr:last-child td{border-bottom:0}
   .login-brand .hide-sm{display:none}
   .home-head .brand{gap:8px}.home-head .brand-mark{height:32px}.home-head .wordmark{font-size:18.5px}
 }
+/* ===================== Íconos y botones con ícono ===================== */
+.btn svg{width:17px;height:17px;flex:0 0 auto}
+.btn:has(> svg){display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.icon-btn{position:relative;display:inline-grid;place-items:center;width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--muted);cursor:pointer;padding:0;text-decoration:none}
+.icon-btn svg{width:19px;height:19px}
+.icon-btn:hover{color:var(--text);border-color:var(--accent)}
+.icon-btn.danger:hover{color:var(--down);border-color:var(--down)}
+.badge{position:absolute;top:-6px;right:-7px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;background:var(--down);color:#fff;font-size:10.5px;font-weight:700;display:grid;place-items:center;line-height:1;box-shadow:0 0 0 2px var(--bg)}
+.ico-wrap{position:relative;display:inline-grid;flex:0 0 22px}
+.action .ai svg{width:22px;height:22px}
+.pp-item .mi,.menu-item .mi{display:grid;place-items:center}
+.pp-item .mi svg,.menu-item .mi svg{width:18px;height:18px;display:block}
+.menu-item .chev{display:grid;place-items:center}
+.menu-item .chev svg{width:16px;height:16px}
+.nowrap{white-space:nowrap}
+.field-label{font-weight:500;font-size:13px;color:var(--muted)}
+
+/* ===================== Inicio ===================== */
+.home-head{margin-bottom:14px}
+.home-head-r{display:flex;align-items:center;gap:8px}
+.hero{margin-bottom:14px}
+.cash-box{display:grid;gap:8px}
+.dinero-botones{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.dinero-botones .btn{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;padding:10px 4px;white-space:nowrap;text-decoration:none;border:1px solid var(--line);background:var(--card);border-radius:14px}
+.dinero-botones .btn svg{width:20px;height:20px;color:var(--brand2)}
+.dinero-botones .btn:hover{border-color:var(--accent)}
+.home-grid{grid-template-columns:repeat(3,minmax(0,1fr));grid-template-areas:"chart chart patri" "favs favs patri";align-items:stretch}
+.area-chart{grid-area:chart;min-width:0}
+.area-patri{grid-area:patri;min-width:0}
+.area-favs{grid-area:favs;min-width:0}
+.area-chart>.card,.area-patri>.card{height:100%}
+.ctitle h2 .count{font-size:13px;font-weight:500;margin-left:4px}
+.fav-table{min-width:0}
+.fav-table td{padding-top:9px;padding-bottom:9px}
+.area-favs .link-btn{display:inline-block;margin-top:8px;text-decoration:none}
+.area-favs .empty div{margin-top:10px}
+.patrimonio-card .dist{display:grid;gap:12px;justify-items:center}
+.patrimonio-card .dist-table,.patrimonio-card .dist-nota{justify-self:stretch}
+.dist-table td,.dist-table th{padding:7px 4px}
+.dist-table .sw{border-radius:3px}
+.dist-nota{font-size:12px;margin:0}
+.dolar-mini{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.dolar-mini-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:2px;font-size:13px}
+
+/* ===================== Tablas debajo de los gráficos ===================== */
+.data-table{width:100%;border-collapse:separate;border-spacing:0;margin-top:12px;font-size:13.5px}
+.data-table th{font-size:12px;font-weight:500;color:var(--muted);text-align:left;padding:8px 12px;background:var(--card2);white-space:nowrap}
+.data-table th:first-child{border-radius:9px 0 0 9px}
+.data-table th:last-child{border-radius:0 9px 9px 0}
+.data-table td{padding:10px 12px;font-weight:600;white-space:nowrap;border-bottom:1px solid var(--line)}
+.asset-sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.fuente{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted);margin:12px 0 0;line-height:1.4}
+.fuente .dot{width:7px;height:7px;flex:0 0 auto;background:var(--muted)}
+.fuente .dot.on{background:var(--up);box-shadow:none}
+.fuente.warn{color:var(--warn)}
+.fuente.warn .dot{background:var(--warn)}
+
+/* ===================== Paginación ===================== */
+.paginacion{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:12px 6px 4px;border-top:1px solid var(--line);margin-top:4px;font-size:13px}
+.pag-btns{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.pag-n{display:inline-flex;align-items:center;gap:4px}
+.paginacion .btn{min-width:34px;padding:6px 10px}
+.paginacion .btn:disabled{opacity:.45;cursor:default}
+
+/* ===================== Movimientos ===================== */
+.sim-badge{display:inline-flex;width:fit-content;padding:4px 10px;border-radius:999px;background:var(--warnBg);color:var(--warn);font-size:12px;font-weight:600;margin:2px 0 8px}
+.kpi strong.sim-badge{font-size:13px;margin:6px 0 4px}
+.sim-pill{margin-left:4px}
+.mov-kpis{margin-bottom:16px}
+
+/* ===================== Torta de Mi cartera ===================== */
+.pie-wrap{display:grid;grid-template-columns:minmax(130px,170px) minmax(0,1fr);gap:16px;align-items:center}
+.pie{width:100%;height:auto;display:block;overflow:visible}
+.pie-slice{cursor:pointer;transition:opacity .15s,transform .15s;outline:none}
+.pie-slice.dim{opacity:.35}
+.pie-slice:focus-visible{stroke:var(--text);stroke-width:2.5}
+.pie-legend{display:grid;gap:2px}
+.pie-leg{display:flex;align-items:center;gap:8px;width:100%;border:1px solid transparent;background:transparent;color:var(--text);padding:7px 9px;border-radius:10px;cursor:pointer;font:inherit;font-size:13.5px;text-align:left}
+.pie-leg b{margin-left:auto}
+.pie-leg:hover{background:var(--card2)}
+.pie-leg.on{background:var(--accentBg);border-color:var(--accent)}
+.pie-leg .sw{border-radius:3px;margin-right:0}
+.pie-detalle{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}
+.pie-detalle-head{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:2px;font-size:13.5px}
+.pie-detalle .r{text-align:right}
+.pie-ayuda{font-size:12.5px;margin:10px 0 0}
+
+/* ===================== Alertas de precios ===================== */
+.alertas-grid{display:grid;grid-template-columns:minmax(290px,340px) minmax(0,1fr);gap:12px;align-items:start}
+.alertas-table td{vertical-align:top}
+.alertas-grid>*{min-width:0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.alerta-form .field{margin:12px 0}
+.combo-in{position:relative}
+.combo-list{position:absolute;z-index:30;left:0;right:0;top:calc(100% + 4px);margin:0;padding:4px;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--pop);max-height:300px;overflow:auto}
+.combo-list li{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;font-size:13.5px}
+.combo-list li:hover,.combo-list li[aria-selected="true"]{background:var(--card2)}
+.opciones-tipo{display:grid;gap:6px}
+.opcion{display:grid;gap:2px;text-align:left;border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:12px;padding:9px 12px;cursor:pointer;font:inherit}
+.opcion small{color:var(--muted);font-size:12px}
+.opcion.on{border-color:var(--brand2);background:var(--accentBg);box-shadow:inset 0 0 0 1px var(--brand2)}
+.check{display:flex;align-items:center;gap:8px;font-size:14px;color:var(--text);font-weight:400;cursor:pointer}
+.check input{width:16px;height:16px;accent-color:var(--brand2);flex:0 0 auto}
+.form-actions{display:flex;gap:8px;justify-content:flex-end}
+.form-actions .btn{flex:1}
+.acciones{display:inline-flex;gap:4px}
+.acciones .icon-btn{width:32px;height:32px}
+.acciones .icon-btn svg{width:17px;height:17px}
+.alertas-table tr.apagada td{opacity:.6}
+.alertas-info{margin-top:12px;font-size:13.5px}
+.alertas-info ul{margin:6px 0 0;padding-left:18px;color:var(--muted);display:grid;gap:4px}
+@media(max-width:1100px){
+  .home-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"chart chart" "favs patri"}
+  .alertas-grid{grid-template-columns:minmax(0,1fr)}
+}
+@media(max-width:800px){
+  .home-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"chart" "patri" "favs"}
+  .dinero-botones .btn{font-size:12px;padding:9px 2px}
+  .home-head-r{gap:6px}
+  .acciones{gap:2px}
+  .acciones .icon-btn{width:28px;height:28px;border-color:transparent}
+  .home-head .live{padding:5px 9px;font-size:12px}
+  .pie-wrap{grid-template-columns:minmax(0,1fr)}
+  .pie{max-width:210px;margin:0 auto}
+  .paginacion{justify-content:center}
+  .data-table td,.data-table th{padding-left:10px;padding-right:10px}
+}
+
+@media(max-width:420px){
+  .home-head .wordmark>span{display:none}
+}
 @keyframes spin{to{transform:rotate(360deg)}}
 @media(max-width:560px){.g4{grid-template-columns:minmax(0,1fr)}.chart{height:230px}}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}

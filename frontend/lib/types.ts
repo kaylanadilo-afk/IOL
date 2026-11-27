@@ -120,27 +120,6 @@ export interface Cartera {
   patrimonio_total_ars: number | null;
 }
 
-export interface MasOperado {
-  activo_id: number;
-  ticker: string;
-  nombre: string;
-  tipo: TipoActivo;
-  moneda: Moneda;
-  operaciones: number;
-  cantidad_operada: number;
-  volumen: number;
-  volumen_ars: number;
-}
-
-export interface MasFavorito {
-  activo_id: number;
-  ticker: string;
-  nombre: string;
-  tipo: TipoActivo;
-  moneda: Moneda;
-  favoritos: number;
-}
-
 export interface Sparkline {
   activo_id: number;
   cierres: number[];
@@ -268,4 +247,58 @@ export interface ActivoCrear {
   moneda: Moneda;
   precio_actual: number;
   nivel_riesgo: number;
+}
+
+// ---------- Alertas de precio ----------
+export type TipoAlerta = "sube_pct" | "baja_pct" | "precio";
+export type EstadoAlerta = "activa" | "pausada" | "ejecutada";
+
+export interface Alerta {
+  id: number;
+  activo_id: number;
+  ticker: string;
+  nombre: string;
+  moneda: Moneda;
+  tipo: TipoAlerta;
+  valor: number;
+  direccion: "sube" | "baja";
+  condicion: string;
+  precio_referencia: number;
+  precio_objetivo: number;
+  precio_actual: number;
+  distancia_pct: number | null;
+  estado: EstadoAlerta;
+  recurrente: boolean;
+  aviso_email: boolean;
+  aviso_app: boolean;
+  veces_disparada: number;
+  creada: string;
+  ultima_vez: string | null;
+}
+
+export interface AlertaCrear {
+  activo_id: number;
+  tipo: TipoAlerta;
+  valor: number;
+  recurrente: boolean;
+  aviso_email: boolean;
+  aviso_app: boolean;
+}
+
+export interface Notificacion {
+  id: number;
+  alerta_id: number | null;
+  activo_id: number | null;
+  titulo: string;
+  mensaje: string;
+  precio: number | null;
+  variacion_pct: number | null;
+  email_enviado: boolean;
+  leida: boolean;
+  fecha: string;
+}
+
+export interface Avisos {
+  no_leidas: number;
+  items: Notificacion[];
 }

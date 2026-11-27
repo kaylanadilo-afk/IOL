@@ -14,3 +14,8 @@ def solo_admin(authorization: str | None = Header(None), db: Session = Depends(g
     if not inversor.es_admin:
         raise ForbiddenError("Solo un administrador puede hacer este cambio.")
     return inversor
+
+
+def usuario_actual(authorization: str | None = Header(None), db: Session = Depends(get_db)) -> InversorDTO:
+    """Inversor de la sesión (header Authorization: Bearer <token>). Cada uno ve solo lo suyo."""
+    return InversorService(db).de_token((authorization or "").removeprefix("Bearer ").strip())

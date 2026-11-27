@@ -29,7 +29,7 @@ export const round2 = (n: number) => Math.round(n * 100) / 100;
 export const compacto = (n: number, cur: Moneda | string) => (cur === "USD" ? "US$ " : "$ ") + fmtCompact.format(Number(n) || 0);
 
 export const fecha = (iso: string) =>
-  new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
+  new Date(iso).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 export const hora = (iso: string) => new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 export const horaAR = (ms: number) =>
   new Date(ms).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", hourCycle: "h23", timeZone: TZ });

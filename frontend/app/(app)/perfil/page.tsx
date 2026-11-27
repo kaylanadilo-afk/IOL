@@ -6,6 +6,7 @@ import { compacto, iniciales } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
 import { useMe } from "@/context/SessionContext";
 import { ErrorCard, Loading } from "@/components/ui";
+import { IcoAdmin, IcoAjustes, IcoAlerta, IcoChevron, IcoLista, IcoMep, IcoOperaciones } from "@/components/icons";
 
 export default function PerfilPage() {
   const { me, cuentaId, favs, reloadKey } = useMe();
@@ -20,9 +21,13 @@ export default function PerfilPage() {
   const comitente = me.cuenta?.numero_comitente;
 
   // Secciones que no están en el menú de abajo del celular, y la configuración
-  const secciones: [string, string, string][] = [["/operaciones", "☰", "Operaciones"], ["/movimientos", "⇄", "Movimientos y depósitos"], ["/mep", "$", "Dólar MEP"], ["/rankings", "▲", "Rankings del mercado"]];
-  if (me.es_admin) secciones.push(["/admin", "⚙", "Administración"]);
-  secciones.push(["/perfil/configuracion", "⚙", "Configuración"]);
+  // [ruta, ícono, texto, se ve en la compu] (en la compu el resto ya está en el menú lateral)
+  const secciones: [string, () => React.JSX.Element, string, boolean][] = [
+    ["/movimientos", IcoLista, "Movimientos de la cuenta", true], ["/operaciones", IcoOperaciones, "Operaciones", false],
+    ["/alertas", IcoAlerta, "Alertas de precios", false], ["/mep", IcoMep, "Dólar MEP", false],
+  ];
+  if (me.es_admin) secciones.push(["/admin", IcoAdmin, "Administración", false]);
+  secciones.push(["/perfil/configuracion", IcoAjustes, "Configuración", true]);
 
   return (
     <>
@@ -46,9 +51,8 @@ export default function PerfilPage() {
       </section>
 
       <div className="card menu-list" style={{ padding: "2px 16px", marginBottom: 12 }}>
-        {secciones.map(([href, ico, label]) => (
-          // En la compu esas secciones ya están en el menú lateral: ahí solo queda Configuración
-          <Link key={href} href={href} className={`menu-item${href === "/perfil/configuracion" ? "" : " only-m"}`}><span className="mi">{ico}</span>{label}<span className="chev">›</span></Link>
+        {secciones.map(([href, Ico, label, enCompu]) => (
+          <Link key={href} href={href} className={`menu-item${enCompu ? "" : " only-m"}`}><span className="mi"><Ico /></span>{label}<span className="chev"><IcoChevron /></span></Link>
         ))}
       </div>
 

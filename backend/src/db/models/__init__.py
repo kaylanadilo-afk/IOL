@@ -7,3 +7,4 @@ from src.db.models.inversor_model import Inversor, favoritos  # noqa: F401
 from src.db.models.cuenta_model import Cuenta, Movimiento, Tenencia  # noqa: F401
 from src.db.models.activo_model import Activo, CierreDiario, CotizacionIntradia, Dividendo  # noqa: F401
 from src.db.models.operacion_model import Operacion  # noqa: F401
+from src.db.models.alerta_model import Alerta, Notificacion  # noqa: F401

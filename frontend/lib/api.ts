@@ -1,8 +1,8 @@
 // Cliente de la API del broker. Todas las rutas van a /api/* y next.config.ts las reenvía al backend.
 import type {
-  Activo, ActivoCrear, Cartera, Cuenta, DividendoResultado, Dolares, EstadoHistorial, EstadoMercado,
+  Activo, ActivoCrear, Alerta, AlertaCrear, Avisos, Cartera, Cuenta, DividendoResultado, Dolares, EstadoHistorial, EstadoMercado,
   EstadoPrecios, Evolucion, FiltroOperaciones, Ganancias, HistorialDiario, HistorialOperaciones, Intradia,
-  Inversor, InversorCrear, MasFavorito, MasOperado, MepResultado, Moneda, Movimiento, Operacion, Perfil, Sesion,
+  Inversor, InversorCrear, MepResultado, Moneda, Movimiento, Operacion, Perfil, Sesion,
   Sparkline, TipoActivo,
 } from "./types";
 
@@ -100,8 +100,6 @@ export const api = {
   cambiarPrecio: (id: number, precio: number) => request<Activo>("PATCH", `/activos/${id}/precio`, { precio }),
   cambiarEstado: (id: number, activo: boolean) => request<Activo>("PATCH", `/activos/${id}/estado`, { activo }),
   sparklines: (dias = 30) => request<Sparkline[]>("GET", `/activos/sparklines?dias=${dias}`),
-  masOperados: () => request<MasOperado[]>("GET", "/activos/mas-operados"),
-  masFavoritos: () => request<MasFavorito[]>("GET", "/activos/mas-favoritos"),
   historial: (id: number, dias: number | string) => request<HistorialDiario>("GET", `/activos/${id}/historial?dias=${dias}`),
   intradia: (id: number, fecha?: string) => request<Intradia>("GET", `/activos/${id}/intradia${qs({ fecha })}`),
   pagarDividendo: (datos: { activo_id: number; monto_por_unidad: number; fecha_pago?: string }) =>
@@ -122,4 +120,13 @@ export const api = {
   operaciones: (id: number, filtro: Partial<FiltroOperaciones> = {}) =>
     request<HistorialOperaciones>("GET", `/cuentas/${id}/operaciones${qs(filtro)}`),
   ganancias: (id: number) => request<Ganancias>("GET", `/cuentas/${id}/ganancias-realizadas`),
+
+  // Alertas de precio y avisos (cada uno ve solo las suyas: van con el token de la sesión)
+  alertas: () => request<Alerta[]>("GET", "/alertas"),
+  crearAlerta: (datos: AlertaCrear) => request<Alerta>("POST", "/alertas", datos),
+  editarAlerta: (id: number, datos: Partial<AlertaCrear>) => request<Alerta>("PUT", `/alertas/${id}`, datos),
+  estadoAlerta: (id: number, estado: "activa" | "pausada") => request<Alerta>("PATCH", `/alertas/${id}/estado`, { estado }),
+  borrarAlerta: (id: number) => request<null>("DELETE", `/alertas/${id}`),
+  avisos: () => request<Avisos>("GET", "/notificaciones"),
+  leerAvisos: () => request<null>("POST", "/notificaciones/leidas"),
 };

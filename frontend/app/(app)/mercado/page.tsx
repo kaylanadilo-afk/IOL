@@ -1,24 +1,32 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useState } from "react";
 import { api } from "@/lib/api";
 import { money, num, RIESGO_MAX, TIPO_LBL } from "@/lib/format";
 import type { Moneda, TipoActivo } from "@/lib/types";
 import { useAsync } from "@/lib/useAsync";
 import { useMe } from "@/context/SessionContext";
 import { Sparkline } from "@/components/charts";
-import { ErrorCard, EstadoPill, Head, Loading, RiskDots, StarButton, VarPill } from "@/components/ui";
+import { ErrorCard, EstadoPill, FuentePrecios, Head, Loading, Paginacion, RiskDots, StarButton, VarPill } from "@/components/ui";
 
 const TABS: [string, string][] = [["", "Todos"], ["fav", "★ Favoritos"], ["accion", "Acciones"], ["cedear", "CEDEARs"], ["bono", "Bonos"]];
+const POR_PAGINA = 15;
 
 export default function MercadoPage() {
+  // useSearchParams necesita un Suspense alrededor para poder prerenderizar la página
+  return <Suspense fallback={<Loading />}><Mercado /></Suspense>;
+}
+
+function Mercado() {
   const { me, cuentaId, favs, activoById, reloadKey } = useMe();
   const router = useRouter();
+  const params = useSearchParams();
   const [tipo, setTipo] = useState<TipoActivo | "">("");
-  const [soloFavs, setSoloFavs] = useState(false);
+  const [soloFavs, setSoloFavs] = useState(params.get("favoritos") === "1");
   const [moneda, setMoneda] = useState<Moneda | "">("");
   const [search, setSearch] = useState("");
+  const [pagina, setPagina] = useState(1);
 
   // El filtro por tipo y moneda lo resuelve la API: GET /activos?tipo=&moneda=  (HU2)
   const { data, error, reload } = useAsync(
@@ -30,6 +38,7 @@ export default function MercadoPage() {
   if (error) return <>{head}<ErrorCard message={error} onRetry={reload} /></>;
 
   let rows: React.ReactNode = null;
+  let total = 0, paginas = 1, actual = 1;
   if (data) {
     const [lista, cart, sparks] = data;
     const spark = Object.fromEntries(sparks.map((s) => [s.activo_id, s.cierres]));
@@ -41,7 +50,11 @@ export default function MercadoPage() {
       return !q || `${a.ticker} ${a.nombre}`.toLowerCase().includes(q);
     });
     const abrir = (id: number) => router.push(`/mercado/${id}`);
-    rows = list.length ? list.map((a) => (
+    total = list.length;
+    paginas = Math.max(1, Math.ceil(total / POR_PAGINA));
+    actual = Math.min(pagina, paginas);
+    const visibles = list.slice((actual - 1) * POR_PAGINA, actual * POR_PAGINA);
+    rows = visibles.length ? visibles.map((a) => (
       <tr key={a.id} className="row-click" tabIndex={0} onClick={() => abrir(a.id)}
         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); abrir(a.id); } }}>
         <td><StarButton a={a} /></td>
@@ -68,16 +81,17 @@ export default function MercadoPage() {
             return (
               <button key={t} type="button" className={`tab${active ? " active" : ""}`} onClick={() => {
                 if (t === "fav") { setSoloFavs(true); setTipo(""); } else { setSoloFavs(false); setTipo(t as TipoActivo | ""); }
+                setPagina(1);
               }}>{l}</button>
             );
           })}
         </div>
-        <select aria-label="Moneda" value={moneda} onChange={(e) => setMoneda(e.target.value as Moneda | "")}>
+        <select aria-label="Moneda" value={moneda} onChange={(e) => { setMoneda(e.target.value as Moneda | ""); setPagina(1); }}>
           <option value="">Todas las monedas</option>
           <option value="ARS">Pesos (ARS)</option>
           <option value="USD">Dólares (USD)</option>
         </select>
-        <input className="search" type="search" placeholder="Buscar por ticker o nombre…" aria-label="Buscar activo" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <input className="search" type="search" placeholder="Buscar por ticker o nombre…" aria-label="Buscar activo" value={search} onChange={(e) => { setSearch(e.target.value); setPagina(1); }} />
       </div>
       {data ? (
         <div className="card table-wrap">
@@ -90,8 +104,11 @@ export default function MercadoPage() {
             </thead>
             <tbody>{rows}</tbody>
           </table>
+          <Paginacion pagina={actual} paginas={paginas} total={total} porPagina={POR_PAGINA}
+            onCambio={(p) => { setPagina(p); window.scrollTo({ top: 0, behavior: "smooth" }); }} />
         </div>
       ) : <Loading />}
+      <FuentePrecios />
     </>
   );
 }

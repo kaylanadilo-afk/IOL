@@ -62,6 +62,9 @@ class ActivoService:
         if ahora is not None:  # el cambio manual también queda en el gráfico
             historial_service.registrar_precio(self.db, activo, precio, ahora)
         self.db.commit()
+        # Un cambio manual de precio también revisa las alertas de ese activo
+        from src.services.alertas_service import AlertasService
+        AlertasService(self.db).evaluar([activo.id])
         return to_activo(activo)
 
     def actualizar_estado(self, activo_id: int, operable: bool) -> ActivoDTO:

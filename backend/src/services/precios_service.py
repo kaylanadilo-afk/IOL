@@ -20,6 +20,8 @@ import httpx
 from sqlalchemy.orm import Session
 
 from src.repositories.broker_repository import ActivoRepository
+from src.services import catalogo_service as catalogo
+from src.services.alertas_service import AlertasService
 from src.services import historial_service as historial
 from src.utils.mercado import q4
 
@@ -32,7 +34,7 @@ DOLARAPI = "https://dolarapi.com/v1/dolares"
 ESCALA = {"arg_bonds": Decimal("0.01")}
 TIMEOUT = 10.0
 
-estado = {"ultima_sincronizacion": None, "actualizados": 0, "sin_dato": [], "error": None}
+estado = {"ultima_sincronizacion": None, "actualizados": 0, "sin_dato": [], "alertas_disparadas": 0, "error": None}
 _cache_dolares = {"t": 0.0, "datos": None}
 
 
@@ -101,8 +103,15 @@ def aplicar_cotizaciones(db: Session, cotizaciones: dict[str, dict], ahora: date
 def sincronizar(db: Session) -> dict:
     """Trae las cotizaciones y las guarda. Deja registro del resultado en `estado`."""
     try:
-        res = aplicar_cotizaciones(db, obtener_cotizaciones())
+        cotizaciones = obtener_cotizaciones()
+        # Suma al catálogo las acciones y CEDEARs reales que falten (con el precio que trae la fuente)
+        nuevos = catalogo.ampliar(db, cotizaciones)
+        if nuevos:
+            log.info("Activos agregados al catálogo: %s", ", ".join(nuevos))
+        res = aplicar_cotizaciones(db, cotizaciones)
         db.commit()
+        # Con los precios nuevos se revisan las alertas de los usuarios (aunque nadie tenga la página abierta)
+        res["alertas_disparadas"] = AlertasService(db).evaluar()
         estado.update(ultima_sincronizacion=datetime.now(timezone.utc), error=None, **res)
     except Exception as exc:  # la API sigue funcionando con los últimos precios
         db.rollback()

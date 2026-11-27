@@ -165,3 +165,41 @@ export function LineChart({ pts, opt, className = "chart", id }: { pts: ChartPoi
     </div>
   );
 }
+
+
+/* ===================== TORTA (distribución por categoría) ===================== */
+export interface PieSlice { key: string; label: string; value: number; color: string }
+
+/** Torta con porciones seleccionables (mouse, toque o teclado). */
+export function PieChart({ parts, selected, onSelect, aria }: {
+  parts: PieSlice[]; selected: string | null; onSelect: (key: string | null) => void; aria: string;
+}) {
+  const visibles = parts.filter((p) => p.value > 0);
+  const total = visibles.reduce((s, p) => s + p.value, 0);
+  if (total <= 0) return null;
+  const R = 70, C = 80;
+  const punto = (f: number) => [C + R * Math.sin(2 * Math.PI * f), C - R * Math.cos(2 * Math.PI * f)];
+  const inicios = visibles.map((_, i) => visibles.slice(0, i).reduce((s, p) => s + p.value / total, 0));
+  return (
+    <svg className="pie" viewBox="0 0 160 160" role="group" aria-label={aria}>
+      {visibles.map((p, i) => {
+        const f0 = inicios[i], f1 = f0 + p.value / total;
+        const on = selected === p.key;
+        const medio = (f0 + f1) / 2;
+        // La porción elegida se separa un poco del centro
+        const [dx, dy] = on ? [Math.sin(2 * Math.PI * medio) * 5, -Math.cos(2 * Math.PI * medio) * 5] : [0, 0];
+        const comun = {
+          fill: p.color, stroke: "var(--card)", strokeWidth: 1.5, tabIndex: 0, role: "button",
+          "aria-label": `${p.label}: ${((p.value / total) * 100).toFixed(1).replace(".", ",")}%`, "aria-pressed": on,
+          className: `pie-slice${selected && !on ? " dim" : ""}`, transform: `translate(${dx.toFixed(2)} ${dy.toFixed(2)})`,
+          onClick: () => onSelect(on ? null : p.key),
+          onKeyDown: (e: React.KeyboardEvent) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSelect(on ? null : p.key); } },
+        };
+        if (f1 - f0 >= 0.9999) return <circle key={p.key} {...comun} cx={C} cy={C} r={R} />;
+        const [x0, y0] = punto(f0), [x1, y1] = punto(f1);
+        const d = `M${C} ${C} L${x0.toFixed(2)} ${y0.toFixed(2)} A${R} ${R} 0 ${f1 - f0 > 0.5 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)} Z`;
+        return <path key={p.key} {...comun} d={d} />;
+      })}
+    </svg>
+  );
+}
