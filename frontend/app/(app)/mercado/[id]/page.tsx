@@ -93,7 +93,7 @@ export default function ActivoPage() {
   return (
     <>
       <div className="head">
-        <div><Link href="/mercado" className="btn btn-ghost btn-sm">← Volver al mercado</Link></div>
+        <div />
         <Link href={`/alertas?activo=${a.id}`} className="btn btn-ghost btn-sm"><IcoAlerta />Crear alerta de precio</Link>
       </div>
       <div className="grid gtrade">

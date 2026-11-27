@@ -94,3 +94,40 @@ def test_cambiar_contrasena_primero_pide_el_codigo(client, monkeypatch):
     assert client.post(url, json={"permiso": permiso, "nueva": "otra-clave-22"}, headers=nuevo).status_code == 422
 
 
+
+
+def test_olvide_mi_contrasena(client, monkeypatch):
+    import re
+
+    from src.utils import correo
+    mails = []
+    monkeypatch.setattr(correo, "despachar", lambda destino, asunto, texto, html, al_enviar=None: mails.append((destino, asunto, texto)))
+    nuevo_inversor(client, email="olvido@test.com")
+    client.como(None)  # sin sesión
+
+    # Un correo sin cuenta recibe la misma respuesta y no se manda nada
+    r = client.post("/auth/olvide", json={"email": "nadie@test.com"})
+    assert r.status_code == 200 and r.json()["enviado"] is True and not mails
+    assert client.post("/auth/olvide/verificar", json={"email": "nadie@test.com", "codigo": "123456"}).status_code == 422
+
+    r = client.post("/auth/olvide", json={"email": "Olvido@test.com"})
+    assert r.status_code == 200 and mails[-1][0] == "olvido@test.com"
+    codigo = re.search(r"\b(\d{6})\b", mails[-1][2]).group(1)
+    malo = "000000" if codigo != "000000" else "111111"
+    assert client.post("/auth/olvide/verificar", json={"email": "olvido@test.com", "codigo": malo}).status_code == 422
+    r = client.post("/auth/olvide/verificar", json={"email": "olvido@test.com", "codigo": codigo})
+    assert r.status_code == 200
+    permiso = r.json()["permiso"]
+
+    # El permiso es de esa cuenta: no sirve con otro correo
+    nuevo_inversor(client, email="otra@test.com")
+    client.como(None)
+    assert client.post("/auth/olvide/cambiar", json={"email": "otra@test.com", "permiso": permiso, "nueva": "recuperada-1"}).status_code == 422
+
+    r = client.post("/auth/olvide/cambiar", json={"email": "olvido@test.com", "permiso": permiso, "nueva": "recuperada-1"})
+    assert r.status_code == 200 and r.json()["token"] and r.json()["inversor"]["email"] == "olvido@test.com"
+    assert "cambió" in mails[-1][1]
+    assert ingresar(client, "olvido@test.com", PASSWORD).status_code == 401
+    assert ingresar(client, "olvido@test.com", "recuperada-1").status_code == 200
+    # Se usa una sola vez
+    assert client.post("/auth/olvide/cambiar", json={"email": "olvido@test.com", "permiso": permiso, "nueva": "otra-mas-22"}).status_code == 422

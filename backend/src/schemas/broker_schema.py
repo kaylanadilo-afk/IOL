@@ -101,6 +101,18 @@ class ConfirmarPasswordSchema(BaseModel):
         return v
 
 
+class OlvideSchema(BaseModel):
+    email: str = Field(min_length=3, max_length=200)
+
+
+class OlvideVerificarSchema(ConfirmarPasswordSchema):
+    email: str = Field(min_length=3, max_length=200)
+
+
+class OlvideCambiarSchema(CambiarPasswordSchema):
+    email: str = Field(min_length=3, max_length=200)
+
+
 # ---------- Activos ----------
 class CreateActivoSchema(BaseModel):
     ticker: str

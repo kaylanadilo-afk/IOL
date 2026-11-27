@@ -83,6 +83,8 @@ CODIGO = Limitador(10, 60 * 60, "Demasiados códigos incorrectos.")
 REENVIO = Limitador(5, 60 * 60, "Ya te mandamos varios códigos.")
 # Revisar correos del formulario de alta: 20 por minuto por IP (consulta servidores de terceros)
 VALIDAR_EMAIL = Limitador(20, 60, "Demasiadas consultas.")
+# "Olvidé mi contraseña": 10 pedidos de código por hora por IP (cada uno manda un correo)
+OLVIDE_IP = Limitador(10, 60 * 60, "Pediste demasiados códigos.")
 # Informe nuevo de la IA (saltando la caché): 1 cada 2 minutos por cuenta (cuota compartida de Groq)
 INFORME_IA = Limitador(1, 120, "Ya pediste un informe nuevo hace poco.")
 

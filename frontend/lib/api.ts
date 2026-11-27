@@ -81,6 +81,13 @@ export const api = {
   validarEmail: (email: string) => request<{ valido: boolean; email: string; mensaje: string | null }>("POST", "/inversores/validar-email", { email }),
   inversor: (id: number) => request<Inversor>("GET", `/inversores/${id}`),
   cambiarPerfil: (id: number, perfil_riesgo: Perfil) => request<Inversor>("PATCH", `/inversores/${id}/perfil`, { perfil_riesgo }),
+  // Olvidé mi contraseña (sin sesión): código al correo → permiso → contraseña nueva (abre la sesión)
+  olvidePedir: (email: string) =>
+    request<{ enviado: boolean; email: string; minutos: number }>("POST", "/auth/olvide", { email }),
+  olvideVerificar: (email: string, codigo: string) =>
+    request<{ permiso: string; minutos: number }>("POST", "/auth/olvide/verificar", { email, codigo }),
+  olvideCambiar: (email: string, permiso: string, nueva: string) =>
+    request<Sesion>("POST", "/auth/olvide/cambiar", { email, permiso, nueva }),
   // Cambio de contraseña: 1) llega un código al correo, 2) se confirma (da un permiso), 3) se elige la nueva
   pedirCodigoPassword: (id: number) =>
     request<{ enviado: boolean; email: string; minutos: number }>("POST", `/inversores/${id}/password/codigo`),

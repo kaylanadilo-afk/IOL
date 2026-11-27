@@ -66,10 +66,6 @@ body:not(.is-admin) .admin-only{display:none!important}
 .login-brand p{margin:7px 0 0;color:var(--muted);font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
 .login-card h1{margin-top:20px}
 .login-sub{color:var(--muted);margin:0 0 14px}
-.admin-badge{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:var(--warnBg);color:var(--warn);font-size:12.5px;font-weight:600}
-.admin-badge svg{width:15px;height:15px}
-.login-admin{position:absolute;left:20px;bottom:16px;bottom:calc(16px + env(safe-area-inset-bottom));border:0;background:transparent;color:var(--muted);font:inherit;font-size:12px;opacity:.75;cursor:pointer;padding:6px 8px;border-radius:8px}
-.login-admin:hover{opacity:1;color:var(--text)}
 .login-card h1{font-size:30px;margin:22px 0 4px;letter-spacing:-.03em}
 .login-card .btn-primary{padding:13px;margin-top:6px}
 .field{display:grid;gap:6px;margin:14px 0}
@@ -193,6 +189,8 @@ body:not(.menu-open) .sidebar .side-mkt[data-tip]:hover::after{white-space:norma
 .home-head .wordmark{font-size:22px}
 .hero{display:grid;grid-template-columns:minmax(0,1fr) minmax(260px,340px);gap:12px;align-items:end;margin-bottom:12px}
 .hero-label{color:var(--muted);font-size:14px}
+/* El saludo arriba, a la altura de "Disponible para operar"; el monto abajo, a la altura de los botones */
+.hero-main{align-self:stretch;display:flex;flex-direction:column;justify-content:space-between;padding-top:11px}
 /* El número del patrimonio es el elemento protagonista: grande, con los centavos chicos como en una etiqueta de precio */
 .hero-num{font-size:clamp(38px,5.4vw,64px);font-weight:600;letter-spacing:-.045em;line-height:1.02;margin:6px 0 8px;white-space:nowrap}
 .hero-num .cts{font-size:.42em;letter-spacing:-.01em;color:var(--muted);vertical-align:.95em;margin-left:2px}
@@ -293,6 +291,9 @@ tbody tr:last-child td{border-bottom:0}
 .pf-hero{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:20px;align-items:center;margin-bottom:12px}
 .back-link{display:inline-block;color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:500;margin-bottom:4px}
 .back-link:hover{color:var(--text)}
+button.back-link{border:0;background:transparent;font:inherit;font-size:13.5px;padding:0;cursor:pointer}
+.back-link.volver{display:block;margin:0 0 10px}
+.link-btn.olvide{display:block;margin:12px auto 0}
 .cfg-head h1{margin:0}
 /* Ojito del inicio: oculta los montos */
 .hero-label{display:flex;align-items:center;gap:6px}
@@ -398,6 +399,7 @@ tbody tr:last-child td{border-bottom:0}
   .big-price{font-size:30px}
   .home-head{margin-bottom:18px}
   .hero{grid-template-columns:minmax(0,1fr);gap:12px;margin-bottom:12px}
+  .hero-main{padding-top:0}
   .hero-num{font-size:clamp(34px,11vw,48px)}
   .home-grid{grid-template-columns:minmax(0,1fr)}.home-grid .span2{grid-column:auto}
   .kpis{grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.kpis .feat,.kpis .kpi2:last-child{grid-column:1/-1}

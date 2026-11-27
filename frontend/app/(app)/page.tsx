@@ -71,7 +71,7 @@ export default function InicioPage() {
       </div>
 
       <section className="hero">
-        <div>
+        <div className="hero-main">
           <div className="hero-label">
             Hola, {me.nombre.split(" ")[0]}. Tu patrimonio
             <button type="button" className="hide-btn" onClick={alternarOcultar} aria-pressed={ocultar}

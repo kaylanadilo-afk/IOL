@@ -58,6 +58,17 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     window.scrollTo(0, 0);
   }, [path, setSheetOpen]);
 
+  // Botón "Volver": a la pantalla anterior dentro de la app; si se entró directo, a la sección de arriba
+  const anterior = useRef<string | null>(null);
+  const actualRef = useRef(path);
+  useEffect(() => {
+    if (actualRef.current !== path) { anterior.current = actualRef.current; actualRef.current = path; }
+  }, [path]);
+  const volver = () => {
+    if (anterior.current) router.back();
+    else router.push(path.split("/").slice(0, -1).join("/") || "/");
+  };
+
   usePullToRefresh(estado === "listo", reloadAll, vibrar);
 
   if (estado !== "listo" || !me) {
@@ -120,7 +131,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      <main className="main"><div className="view">{children}</div></main>
+      <main className="main"><div className="view">
+        {path !== "/" && <button type="button" className="back-link volver" onClick={volver}>‹ Volver</button>}
+        {children}
+      </div></main>
 
       {/* Celular: menú inferior estilo Instagram (solo íconos; el activo se rellena) */}
       <nav className="tabbar" aria-label="Menú principal">

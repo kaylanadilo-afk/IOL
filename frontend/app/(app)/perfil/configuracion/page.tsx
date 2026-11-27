@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { api, ApiError, guardarToken } from "@/lib/api";
@@ -54,7 +53,6 @@ export default function ConfiguracionPage() {
     <>
       <div className="head cfg-head">
         <div>
-          <Link href="/perfil" className="back-link">‹ Mi perfil</Link>
           <h1>Configuración</h1>
         </div>
       </div>

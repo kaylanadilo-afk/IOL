@@ -18,7 +18,7 @@ export default function LoginPage() {
   const { estado, ingresar } = useSession();
   const { toast } = useUI();
   const router = useRouter();
-  const [tab, setTab] = useState<"in" | "alta" | "admin">("in");
+  const [tab, setTab] = useState<"in" | "alta">("in");
   const [err, setErr] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -31,11 +31,13 @@ export default function LoginPage() {
   const emailRevisado = useRef("");
   // Correo pendiente de confirmar: mientras haya uno, se muestra la pantalla del código
   const [verificando, setVerificando] = useState<string | null>(null);
+  // "Olvidé mi contraseña": se muestra la pantalla para recuperarla
+  const [recuperando, setRecuperando] = useState(false);
 
-  // Con sesión abierta se va directo a la app (el administrador, a su sección)
+  // Con sesión abierta se va directo a la app
   useEffect(() => {
-    if (estado === "listo") router.replace(tab === "admin" ? "/admin" : "/");
-  }, [estado, router, tab]);
+    if (estado === "listo") router.replace("/");
+  }, [estado, router]);
 
   const irA = (t: typeof tab) => {
     setTab(t);
@@ -43,7 +45,6 @@ export default function LoginPage() {
     setPass("");
     setLoginErr({});
     setErrores({});
-    if (t === "admin") setEmail("");
   };
 
   const enfocar = (id: string) => requestAnimationFrame(() => document.getElementById(id)?.focus());
@@ -56,13 +57,7 @@ export default function LoginPage() {
     if (errs.email || errs.pass) return enfocar(errs.email ? "loginEmail" : "loginPass");
     setBusy(true);
     try {
-      const sesion = await api.ingresar(email, pass);
-      // El acceso de administración es solo para cuentas con ese permiso
-      if (tab === "admin" && !sesion.inversor.es_admin) {
-        setErr("Esta cuenta no tiene permisos de administrador.");
-        return;
-      }
-      await ingresar(sesion);
+      await ingresar(await api.ingresar(email, pass));
       setPass("");
     } catch (error) {
       if (error instanceof ApiError && error.codigo === "EmailNoVerificadoError") {
@@ -154,28 +149,25 @@ export default function LoginPage() {
             <VerificarCorreo email={verificando}
               onListo={async (s) => { toast(`¡Listo! Tu cuenta comitente N° ${s.inversor.cuenta?.numero_comitente} está activa.`); await ingresar(s); }}
               onVolver={() => { setVerificando(null); setErr(""); }} />
+          ) : recuperando ? (
+            <RecuperarPassword emailInicial={email}
+              onListo={async (s) => { toast("Listo: tu contraseña cambió. Ya ingresaste."); await ingresar(s); }}
+              onVolver={() => { setRecuperando(false); setErr(""); setPass(""); }} />
           ) : (<>
-          {tab === "admin" ? (
-            <div className="admin-badge">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" aria-hidden="true"><path d="M12 3l7.5 3v5.5c0 4.6-3.2 8.3-7.5 9.5-4.3-1.2-7.5-4.9-7.5-9.5V6z" /></svg>
-              Acceso restringido
-            </div>
-          ) : (
             <div className="tabs">
               <button type="button" className={`tab${tab === "in" ? " active" : ""}`} onClick={() => irA("in")}>Ingresar</button>
               <button type="button" className={`tab${tab === "alta" ? " active" : ""}`} onClick={() => irA("alta")}>Crear cuenta</button>
             </div>
-          )}
 
-        {tab !== "alta" ? (
+        {tab === "in" ? (
           <form onSubmit={onLogin} noValidate>
-            <h1>{tab === "admin" ? "Administración" : "Ingresá a tu cuenta"}</h1>
-            {tab === "admin" && <p className="login-sub">Ingresá con una cuenta de administrador.</p>}
-            <TextField id="loginEmail" label="Email" type="email" autoComplete="username" placeholder={tab === "admin" ? "admin@empresa.com" : "tu@email.com"}
+            <h1>Ingresá a tu cuenta</h1>
+            <TextField id="loginEmail" label="Email" type="email" autoComplete="username" placeholder="tu@email.com"
               value={email} error={loginErr.email} onChange={(v) => { setEmail(v); if (loginErr.email) setLoginErr((l) => ({ ...l, email: errorEmail(v) ?? undefined })); }} />
             <PasswordField id="loginPass" label="Contraseña" autoComplete="current-password" value={pass} error={loginErr.pass}
               onChange={(v) => { setPass(v); if (v) setLoginErr((l) => ({ ...l, pass: undefined })); }} />
-            <button className="btn btn-primary full" type="submit" disabled={busy}>{tab === "admin" ? "Ingresar como administrador" : "Ingresar"}</button>
+            <button className="btn btn-primary full" type="submit" disabled={busy}>Ingresar</button>
+            <button type="button" className="link-btn olvide" onClick={() => { setRecuperando(true); setErr(""); }}>¿Olvidaste tu contraseña?</button>
           </form>
         ) : (
           <form onSubmit={onAlta} noValidate>
@@ -205,10 +197,123 @@ export default function LoginPage() {
           </>)}
         </div>
       </div>
-      <button type="button" className="login-admin" onClick={() => irA(tab === "admin" ? "in" : "admin")}>
-        {tab === "admin" ? "← Volver al ingreso de inversores" : "Ingresar como administrador"}
-      </button>
     </section>
+  );
+}
+
+/* ===================== OLVIDÉ MI CONTRASEÑA ===================== */
+// 1) correo → llega un código · 2) código → permiso · 3) contraseña nueva → se abre la sesión
+function RecuperarPassword({ emailInicial, onListo, onVolver }: { emailInicial: string; onListo: (s: Sesion) => Promise<void>; onVolver: () => void }) {
+  const [paso, setPaso] = useState<"email" | "codigo" | "nueva">("email");
+  const [email, setEmail] = useState(emailInicial);
+  const [oculto, setOculto] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [permiso, setPermiso] = useState("");
+  const [nueva, setNueva] = useState("");
+  const [rep, setRep] = useState("");
+  const [errores, setErrores] = useState<Record<string, string>>({});
+  const [general, setGeneral] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [espera, setEspera] = useState(0);
+
+  useEffect(() => {
+    if (espera <= 0) return;
+    const t = setTimeout(() => setEspera((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [espera]);
+
+  const correr = async (fn: () => Promise<void>) => {
+    setGeneral(""); setBusy(true);
+    try {
+      await fn();
+    } catch (e) {
+      const campos = e instanceof ApiError ? e.campos : {};
+      // El permiso venció o no sirve: hay que volver a pedir el código
+      if (paso === "nueva" && campos.codigo) { setPaso("email"); setPermiso(""); setGeneral(campos.codigo); return; }
+      if (Object.keys(campos).length) setErrores(campos); else setGeneral((e as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const pedir = (e?: React.FormEvent) => {
+    e?.preventDefault();
+    const m = errorEmail(email);
+    if (m) return setErrores({ email: m });
+    correr(async () => {
+      const r = await api.olvidePedir(email.trim());
+      setOculto(r.email); setCodigo(""); setErrores({}); setPaso("codigo"); setEspera(60);
+    });
+  };
+
+  const verificar = (valor = codigo) => {
+    if (!/^\d{6}$/.test(valor)) return setErrores({ codigo: "Ingresá los 6 dígitos del código" });
+    correr(async () => {
+      const r = await api.olvideVerificar(email.trim(), valor);
+      setPermiso(r.permiso); setErrores({}); setPaso("nueva");
+    });
+  };
+
+  const guardar = (e: React.FormEvent) => {
+    e.preventDefault();
+    const errs: Record<string, string> = {};
+    const m = errorPassword(nueva);
+    if (m) errs.nueva = m;
+    else if (nueva !== rep) errs.rep = "Las contraseñas no coinciden";
+    setErrores(errs);
+    if (Object.keys(errs).length) return;
+    correr(async () => { await onListo(await api.olvideCambiar(email.trim(), permiso, nueva)); });
+  };
+
+  return (
+    <div>
+      <button type="button" className="back-link" onClick={onVolver}>‹ Volver a ingresar</button>
+      {paso === "email" && (
+        <form onSubmit={pedir} noValidate>
+          <h1>Recuperá tu contraseña</h1>
+          <p className="login-sub">Escribí el correo de tu cuenta y te mandamos un código para elegir una contraseña nueva.</p>
+          <TextField id="olvideEmail" label="Email" type="email" autoComplete="username" placeholder="tu@email.com" value={email}
+            error={errores.email} onChange={(v) => { setEmail(v); setErrores({}); }} />
+          <button className="btn btn-primary full" type="submit" disabled={busy}>{busy ? "Enviando…" : "Enviarme un código"}</button>
+        </form>
+      )}
+      {paso === "codigo" && (
+        <form onSubmit={(e) => { e.preventDefault(); verificar(); }} noValidate>
+          <h1>Revisá tu correo</h1>
+          <p className="login-sub">Si <b className="verif-mail">{oculto}</b> tiene una cuenta, le llegó un código de 6 dígitos. Si no lo ves, revisá la carpeta de spam.</p>
+          <div className={`field${errores.codigo ? " invalid" : ""}`}>
+            <label htmlFor="olvideCodigo">Código</label>
+            <input id="olvideCodigo" className="otp" inputMode="numeric" autoComplete="one-time-code" maxLength={6} autoFocus
+              placeholder="000000" value={codigo} aria-invalid={!!errores.codigo} aria-describedby={errores.codigo ? "olvideCodigo-err" : undefined}
+              onChange={(e) => {
+                const v = e.target.value.replace(/\D/g, "").slice(0, 6);
+                setCodigo(v); setErrores({});
+                if (v.length === 6) verificar(v);
+              }} />
+            <FieldError id="olvideCodigo" error={errores.codigo} />
+          </div>
+          <button className="btn btn-primary full" type="submit" disabled={busy}>{busy ? "Revisando…" : "Continuar"}</button>
+          <div className="verif-acciones">
+            {espera > 0
+              ? <span className="muted">Podés pedir otro código en {espera} s</span>
+              : <button type="button" className="link-btn" onClick={() => pedir()}>Reenviar código</button>}
+            <button type="button" className="link-btn" onClick={() => { setPaso("email"); setErrores({}); setGeneral(""); }}>Usar otro correo</button>
+          </div>
+        </form>
+      )}
+      {paso === "nueva" && (
+        <form onSubmit={guardar} noValidate>
+          <h1>Elegí tu contraseña nueva</h1>
+          <p className="login-sub">Código confirmado. Al guardarla ingresás directamente y se cierran las otras sesiones.</p>
+          <PasswordField id="olvideNueva" label="Contraseña nueva" autoComplete="new-password" value={nueva} hint="Mínimo 8 caracteres."
+            error={errores.nueva} onChange={(v) => { setNueva(v); setErrores((x) => ({ ...x, nueva: "" })); }} />
+          <PasswordField id="olvideRepetir" label="Repetir la nueva" autoComplete="new-password" value={rep}
+            error={errores.rep} onChange={(v) => { setRep(v); setErrores((x) => ({ ...x, rep: "" })); }} />
+          <button className="btn btn-primary full" type="submit" disabled={busy}>{busy ? "Guardando…" : "Guardar e ingresar"}</button>
+        </form>
+      )}
+      <div className="err" role="alert">{general}</div>
+    </div>
   );
 }
 
