@@ -249,3 +249,21 @@ def test_health_con_la_base_caida_es_503(client, monkeypatch):
     monkeypatch.setattr(modulo, "engine", Caida())
     r = client.get("http://testserver/health")
     assert r.status_code == 503 and r.json()["status"] == "error"
+
+
+def test_vistas_legibles_de_la_base(client):
+    """Las vistas ver_* se crean y muestran nombres/tickers en lugar de IDs (sin contraseñas)."""
+    from sqlalchemy import create_engine, text
+
+    from src.db import vistas
+    from src.db.connection import Base
+    import src.db.models  # noqa: F401
+    motor = create_engine("sqlite://")
+    Base.metadata.create_all(motor)
+    with motor.begin() as c:
+        vistas.crear(c)
+        vistas.crear(c)  # se puede volver a correr en cada arranque
+        for nombre in vistas.VISTAS:
+            columnas = list(c.execute(text(f"SELECT * FROM {nombre}")).keys())
+            assert not any("hash" in col or "codigo" in col for col in columnas), nombre
+        assert "comitente" in list(c.execute(text("SELECT * FROM ver_cuentas")).keys())

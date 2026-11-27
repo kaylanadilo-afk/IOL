@@ -40,6 +40,10 @@ CREATE TABLE inversores (
 	codigo_expira TIMESTAMP WITH TIME ZONE, 
 	codigo_enviado TIMESTAMP WITH TIME ZONE, 
 	codigo_intentos INTEGER DEFAULT '0' NOT NULL, 
+	pwd_nueva_hash VARCHAR(200), 
+	pwd_codigo_hash VARCHAR(128), 
+	pwd_codigo_expira TIMESTAMP WITH TIME ZONE, 
+	pwd_intentos INTEGER DEFAULT '0' NOT NULL, 
 	PRIMARY KEY (id), 
 	CONSTRAINT ck_inversor_perfil CHECK (perfil_riesgo IN ('conservador', 'moderado', 'agresivo')), 
 	CONSTRAINT ck_inversor_cuit CHECK (length(cuit) = 11), 
@@ -218,3 +222,92 @@ CREATE TABLE tenencias (
 	FOREIGN KEY(cuenta_id) REFERENCES cuentas (id), 
 	FOREIGN KEY(activo_id) REFERENCES activos (id)
 );
+
+-- =============================================================================
+-- Vistas para leer la base con nombres y tickers en lugar de IDs (solo lectura)
+-- =============================================================================
+
+-- ver_inversores
+CREATE OR REPLACE VIEW ver_inversores AS
+    SELECT i.id, i.nombre, i.email, i.cuit, i.perfil_riesgo,
+               CASE WHEN i.es_admin THEN 'Sí' ELSE 'No' END AS es_admin,
+               CASE WHEN i.email_verificado THEN 'Sí' ELSE 'No' END AS email_confirmado,
+               c.numero_comitente AS comitente, i.fecha_alta
+        FROM inversores i
+        LEFT JOIN cuentas c ON c.inversor_id = i.id;
+
+-- ver_cuentas
+CREATE OR REPLACE VIEW ver_cuentas AS
+    SELECT c.numero_comitente AS comitente, i.nombre AS inversor, i.email,
+               c.saldo_ars, c.saldo_usd
+        FROM cuentas c
+        JOIN inversores i ON i.id = c.inversor_id;
+
+-- ver_tenencias
+CREATE OR REPLACE VIEW ver_tenencias AS
+    SELECT c.numero_comitente AS comitente, i.nombre AS inversor, a.ticker, a.nombre AS activo,
+               a.tipo, a.moneda, t.cantidad, t.precio_promedio, a.precio_actual,
+               t.cantidad * a.precio_actual AS valor_actual
+        FROM tenencias t
+        JOIN cuentas c ON c.id = t.cuenta_id
+        JOIN inversores i ON i.id = c.inversor_id
+        JOIN activos a ON a.id = t.activo_id;
+
+-- ver_operaciones
+CREATE OR REPLACE VIEW ver_operaciones AS
+    SELECT o.id, o.fecha, c.numero_comitente AS comitente, i.nombre AS inversor, o.tipo,
+               a.ticker, a.nombre AS activo, o.cantidad, o.precio_unitario, o.comision, o.total,
+               o.ganancia_realizada, o.estado
+        FROM operaciones o
+        JOIN cuentas c ON c.id = o.cuenta_id
+        JOIN inversores i ON i.id = c.inversor_id
+        JOIN activos a ON a.id = o.activo_id;
+
+-- ver_movimientos
+CREATE OR REPLACE VIEW ver_movimientos AS
+    SELECT m.id, m.fecha, c.numero_comitente AS comitente, i.nombre AS inversor, m.tipo,
+               m.moneda, m.monto, m.descripcion
+        FROM movimientos m
+        JOIN cuentas c ON c.id = m.cuenta_id
+        JOIN inversores i ON i.id = c.inversor_id;
+
+-- ver_dividendos
+CREATE OR REPLACE VIEW ver_dividendos AS
+    SELECT d.id, d.fecha_pago, a.ticker, a.nombre AS activo, a.moneda, d.monto_por_unidad
+        FROM dividendos d
+        JOIN activos a ON a.id = d.activo_id;
+
+-- ver_favoritos
+CREATE OR REPLACE VIEW ver_favoritos AS
+    SELECT i.nombre AS inversor, i.email, a.ticker, a.nombre AS activo, f.fecha_agregado
+        FROM favoritos f
+        JOIN inversores i ON i.id = f.inversor_id
+        JOIN activos a ON a.id = f.activo_id;
+
+-- ver_alertas
+CREATE OR REPLACE VIEW ver_alertas AS
+    SELECT al.id, i.nombre AS inversor, a.ticker, a.nombre AS activo, al.tipo, al.valor,
+               al.precio_referencia, al.precio_objetivo, a.precio_actual, al.estado,
+               CASE WHEN al.recurrente THEN 'Sí' ELSE 'No' END AS recurrente,
+               CASE WHEN al.aviso_email THEN 'Sí' ELSE 'No' END AS por_correo,
+               CASE WHEN al.aviso_app THEN 'Sí' ELSE 'No' END AS en_la_app,
+               al.veces_disparada, al.creada, al.ultima_vez
+        FROM alertas al
+        JOIN inversores i ON i.id = al.inversor_id
+        JOIN activos a ON a.id = al.activo_id;
+
+-- ver_notificaciones
+CREATE OR REPLACE VIEW ver_notificaciones AS
+    SELECT n.id, n.fecha, i.nombre AS inversor, a.ticker, n.titulo, n.mensaje, n.precio,
+               n.variacion_pct,
+               CASE WHEN n.email_enviado THEN 'Sí' ELSE 'No' END AS correo_enviado,
+               CASE WHEN n.leida THEN 'Sí' ELSE 'No' END AS leida
+        FROM notificaciones n
+        JOIN inversores i ON i.id = n.inversor_id
+        LEFT JOIN activos a ON a.id = n.activo_id;
+
+-- ver_cierres_diarios
+CREATE OR REPLACE VIEW ver_cierres_diarios AS
+    SELECT a.ticker, a.nombre AS activo, cd.fecha, cd.apertura, cd.maximo, cd.minimo, cd.cierre, cd.volumen
+        FROM cierres_diarios cd
+        JOIN activos a ON a.id = cd.activo_id;

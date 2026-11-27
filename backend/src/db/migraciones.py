@@ -4,6 +4,8 @@ Cada paso revisa primero si ya está aplicado, así que se puede correr en cada 
 """
 from sqlalchemy import inspect, text
 
+from src.db import vistas
+
 COLUMNAS_INVERSOR = {
     # Bases creadas antes de la sesión con contraseña y la sección de administración
     "es_admin": "BOOLEAN NOT NULL DEFAULT false",
@@ -82,3 +84,6 @@ def aplicar(engine) -> None:
 
         for nombre, definicion in INDICES.items():
             c.execute(text(f"CREATE INDEX IF NOT EXISTS {nombre} ON {definicion}"))
+
+        # Vistas para leer la base con nombres y tickers en lugar de IDs (ver src/db/vistas.py)
+        vistas.crear(c)

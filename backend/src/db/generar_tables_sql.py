@@ -15,6 +15,7 @@ from sqlalchemy.dialects import postgresql  # noqa: E402
 from sqlalchemy.schema import CreateIndex, CreateTable  # noqa: E402
 
 import src.db.models  # noqa: E402,F401  registra todos los modelos
+from src.db import vistas  # noqa: E402
 from src.db.connection import Base  # noqa: E402
 
 # Las tablas de la plantilla de la cátedra (users, pasajeros, conductores) no son parte del broker
@@ -38,6 +39,12 @@ def generar() -> str:
         partes.append(str(CreateTable(tabla).compile(dialect=dialecto)).strip() + ";")
         for indice in sorted(tabla.indexes, key=lambda i: i.name or ""):
             partes.append(str(CreateIndex(indice).compile(dialect=dialecto)).strip() + ";")
+    partes += [
+        "\n-- =============================================================================",
+        "-- Vistas para leer la base con nombres y tickers en lugar de IDs (solo lectura)",
+        "-- =============================================================================",
+        vistas.sql(),
+    ]
     return "\n".join(partes) + "\n"
 
 
