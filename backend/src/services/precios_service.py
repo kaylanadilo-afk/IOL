@@ -76,6 +76,7 @@ def obtener_cotizaciones() -> dict[str, dict]:
                 cotizaciones[ticker] = {
                     "precio": q4(precio * ESCALA.get(panel, Decimal("1"))),
                     "variacion_pct": _dec(fila.get("pct_change")),
+                    "panel": panel,
                 }
     return cotizaciones
 

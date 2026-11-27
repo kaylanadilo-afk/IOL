@@ -3,7 +3,15 @@
 Los activos se agregan solo si data912 tiene cotización para ese ticker en ese momento: el precio y la
 variación del día salen de la fuente, nunca se inventan. Si un ticker no cotiza, se saltea y se vuelve a
 intentar en la próxima sincronización. El nivel de riesgo (1 a 5) es la clasificación propia de la app.
+
+Acciones: se suman TODAS las que cotizan en pesos en el panel de acciones de BYMA (data912). Las que
+también cotizan en dólares (GGALD, BMA.D...) son la misma acción, así que no se repiten. El nombre de la
+empresa sale de Yahoo Finanzas (misma fuente que el historial); si no lo tiene, se muestra el ticker.
 """
+import logging
+import re
+
+import httpx
 from sqlalchemy.orm import Session
 
 from src.db.models.activo_model import Activo
@@ -36,11 +44,64 @@ CEDEARS = [
 ]
 
 
-def ampliar(db: Session, cotizaciones: dict[str, dict]) -> list[str]:
+log = logging.getLogger("iol.precios")
+YAHOO = "https://query1.finance.yahoo.com/v8/finance/chart/{simbolo}"
+# Panel líder (Merval): riesgo 4. El resto del panel general, con menos volumen: riesgo 5
+PANEL_LIDER = {"ALUA", "BBAR", "BMA", "BYMA", "CEPU", "COME", "CRES", "CVH", "EDN", "GGAL", "HARG", "LOMA", "METR",
+               "MIRG", "PAMP", "SUPV", "TECO2", "TGNO4", "TGSU2", "TRAN", "TXAR", "VALO", "YPFD", "IRSA"}
+_SUFIJOS = re.compile(r",?\s+(S\.?\s?A\.?(\s?I\.?\s?C\.?(\s?y\s?F\.?)?)?|Sociedad An[oó]nima)\s*$", re.IGNORECASE)
+
+
+def nombre_yahoo(ticker: str) -> str | None:
+    """Nombre de la empresa según Yahoo Finanzas (símbolo TICKER.BA). None si no lo tiene o no responde."""
+    try:
+        r = httpx.get(YAHOO.format(simbolo=f"{ticker}.BA"), params={"range": "1d", "interval": "1d"},
+                      headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
+        resultado = r.json().get("chart", {}).get("result") if r.status_code == 200 else None
+        meta = resultado[0].get("meta", {}) if resultado else {}
+    except (httpx.HTTPError, ValueError):
+        return None
+    nombre = (meta.get("longName") or meta.get("shortName") or "").strip()
+    if not nombre or nombre.upper() == ticker:
+        return None
+    if nombre.isupper():  # "HAVANNA HOLDING SA" -> "Havanna Holding SA"
+        nombre = nombre.title()
+    return _SUFIJOS.sub("", nombre).strip(" ,") or None
+
+
+# Especies en dólares cuyo ticker no es "el de pesos + D" (TECO2 -> TECOD, TGNO4 -> TGN4D, TGSU2 -> TGSUD)
+VARIANTES_DOLAR = {"TECOD", "TGN4D", "TGSUD"}
+
+
+def es_variante_en_dolares(ticker: str, tickers: set[str]) -> bool:
+    """GGALD, BMA.D, YPFDD: la misma acción que GGAL, BMA o YPFD, cotizada en dólares."""
+    if ticker.endswith(".D") or ticker in VARIANTES_DOLAR:
+        return True
+    return ticker.endswith("D") and ticker[:-1] in tickers
+
+
+def acciones_del_panel(cotizaciones: dict[str, dict]) -> list[str]:
+    """Tickers en pesos del panel de acciones de BYMA, sin las variantes en dólares."""
+    panel = {t for t, d in cotizaciones.items() if d.get("panel") == "arg_stocks"}
+    return sorted(t for t in panel if not es_variante_en_dolares(t, panel))
+
+
+def ampliar(db: Session, cotizaciones: dict[str, dict], buscar_nombre=nombre_yahoo) -> list[str]:
     """Agrega los activos del catálogo que falten y tengan cotización real. Devuelve los tickers agregados."""
     repo = ActivoRepository(db)
     existentes = {a.ticker for a in repo.list_por_ticker()}
     agregados = []
+    # Todas las acciones del panel: las de la lista tienen nombre y riesgo definidos; el resto se completa
+    conocidas = {t for t, _, _ in ACCIONES}
+    for ticker in acciones_del_panel(cotizaciones):
+        if ticker in existentes or ticker in conocidas or cotizaciones[ticker]["precio"] <= 0:
+            continue
+        dato = cotizaciones[ticker]
+        nombre = buscar_nombre(ticker) or ticker
+        repo.add(Activo(ticker=ticker, nombre=nombre[:120], tipo="accion", moneda="ARS", precio_actual=dato["precio"],
+                        nivel_riesgo=4 if ticker in PANEL_LIDER else 5, activo=True, variacion_pct=dato.get("variacion_pct")))
+        existentes.add(ticker)
+        agregados.append(ticker)
     for tipo, lista in (("accion", ACCIONES), ("cedear", CEDEARS)):
         for ticker, nombre, riesgo in lista:
             dato = cotizaciones.get(ticker)

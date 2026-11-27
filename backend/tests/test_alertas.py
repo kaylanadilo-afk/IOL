@@ -148,3 +148,19 @@ def test_editar_una_pausada_la_deja_pausada(client):
     client.patch(f"/alertas/{al['id']}/estado", json={"estado": "pausada"}, headers=h)
     r = client.put(f"/alertas/{al['id']}", json={"valor": 25}, headers=h).json()
     assert r["estado"] == "pausada" and r["precio_objetivo"] == 75
+
+
+def test_suma_todas_las_acciones_del_panel_sin_las_de_dolares(client):
+    db = next(app.dependency_overrides[get_db]())
+    cot = {t: {"precio": Decimal("100"), "variacion_pct": None, "panel": "arg_stocks"}
+           for t in ("HAVA", "GGAL", "GGALD", "BMA.D", "TECO2", "TECOD", "EDLH")}
+    cot["AAPL"] = {"precio": Decimal("500"), "variacion_pct": None, "panel": "arg_cedears"}
+    nombres = {"HAVA": "Havanna Holding"}
+    agregados = catalogo_service.ampliar(db, cot, buscar_nombre=nombres.get)
+    db.commit()
+    db.close()
+    assert sorted(agregados) == ["EDLH", "GGAL", "HAVA", "TECO2"]
+    activos = {a["ticker"]: a for a in client.get("/activos").json()}
+    assert activos["HAVA"]["nombre"] == "Havanna Holding" and activos["HAVA"]["nivel_riesgo"] == 5
+    assert activos["EDLH"]["nombre"] == "EDLH"  # sin nombre en la fuente: se muestra el ticker
+    assert activos["GGAL"]["nivel_riesgo"] == 4 and "GGALD" not in activos and "TECOD" not in activos

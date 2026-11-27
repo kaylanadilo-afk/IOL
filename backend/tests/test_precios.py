@@ -45,7 +45,7 @@ def red_falsa(monkeypatch):
 
 def test_cotizaciones_escalan_bonos_y_usan_punta_si_no_opero(red_falsa):
     cot = precios.obtener_cotizaciones()
-    assert cot["GGAL"] == {"precio": Decimal("4855.0000"), "variacion_pct": Decimal("-2.46")}
+    assert cot["GGAL"] == {"precio": Decimal("4855.0000"), "variacion_pct": Decimal("-2.46"), "panel": "arg_stocks"}
     assert cot["AL30"]["precio"] == Decimal("813.1000")    # 81310 / 100
     assert cot["AL30D"]["precio"] == Decimal("0.5166")     # 51.66 / 100
     assert cot["YPFD"]["precio"] == Decimal("6220.0000")   # punto medio de la punta
@@ -62,9 +62,11 @@ def test_sincronizar_actualiza_catalogo_sin_tocar_operaciones(client, red_falsa)
 
     r = client.post("/mercado/sincronizar")
     assert r.status_code == 200, r.text
-    assert r.json()["actualizados"] == 3 and r.json()["sin_dato"] == ["INVENTADO"]
+    # YPFD no estaba: cotiza en el panel de acciones, así que se suma al catálogo con su precio real
+    assert r.json()["actualizados"] == 4 and r.json()["sin_dato"] == ["INVENTADO"]
 
     activos = {a["ticker"]: a for a in client.get("/activos").json()}
+    assert activos["YPFD"]["tipo"] == "accion" and activos["YPFD"]["precio_actual"] == 6220
     assert activos["GGAL"]["precio_actual"] == 4855 and activos["GGAL"]["variacion_pct"] == -2.46
     assert activos["GGAL"]["precio_actualizado"] is not None
     assert activos["INVENTADO"]["precio_actual"] == 50  # sin dato, queda el anterior

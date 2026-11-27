@@ -110,6 +110,39 @@ def _cierres_data912(client: httpx.Client, activo: Activo, desde: date) -> list[
     return filas
 
 
+def _cierres_yahoo(client: httpx.Client, activo: Activo, desde: date) -> list[dict]:
+    """Cierres diarios de Yahoo Finanzas (TICKER.BA). Se usan cuando data912 no tiene el historial del activo."""
+    r = client.get(YAHOO.format(simbolo=f"{activo.ticker}.BA"),
+                   params={"interval": "1d", "range": "2y"}, headers={"User-Agent": "Mozilla/5.0"})
+    r.raise_for_status()
+    res = (r.json().get("chart") or {}).get("result") or []
+    if not res:
+        return []
+    q = ((res[0].get("indicators") or {}).get("quote") or [{}])[0]
+    k = escala(activo)
+    filas = []
+    def valor(campo: str, i: int):
+        serie = q.get(campo) or []
+        return serie[i] if i < len(serie) else None
+
+    for i, t in enumerate(res[0].get("timestamp") or []):
+        o, h, l, c, v = (valor(campo, i) for campo in ("open", "high", "low", "close", "volume"))
+        if c is None or c <= 0:
+            continue
+        d = datetime.fromtimestamp(t, timezone.utc).astimezone(TZ_AR).date()
+        if d < desde:
+            continue
+        c = Decimal(str(c)) * k
+        o = Decimal(str(o)) * k if o else c
+        h = Decimal(str(h)) * k if h else c
+        l = Decimal(str(l)) * k if l else c
+        filas.append({"fecha": d, "apertura": q4(o if o > 0 else c), "maximo": q4(max(h, c)),
+                      "minimo": q4(min(l, c) if l > 0 else c), "cierre": q4(c),
+                      "volumen": Decimal(str(v)).quantize(Decimal("0.01")) if v is not None else None})
+    # Si Yahoo repite un día, queda el último dato
+    return list({f["fecha"]: f for f in filas}.values())
+
+
 def _velas_yahoo(client: httpx.Client, activo: Activo) -> list[tuple[datetime, Decimal]]:
     r = client.get(YAHOO.format(simbolo=f"{activo.ticker}.BA"),
                    params={"interval": "5m", "range": "1mo"}, headers={"User-Agent": "Mozilla/5.0"})
@@ -165,7 +198,7 @@ def guardar_intradia(db: Session, activo: Activo, puntos: list[tuple[datetime, D
 
 
 def cargar_historial(db: Session, ahora: datetime | None = None) -> dict:
-    """Trae cierres diarios (data912) e intradiario (Yahoo) para todo el catálogo y hace commit.
+    """Trae cierres diarios (data912, o Yahoo si data912 no los tiene) e intradiario (Yahoo) y hace commit.
 
     Un activo que falla no frena a los demás: queda anotado en `errores`.
     """
@@ -175,8 +208,14 @@ def cargar_historial(db: Session, ahora: datetime | None = None) -> dict:
     res = {"cierres": 0, "puntos_intradia": 0, "activos": 0, "errores": []}
     with httpx.Client(timeout=TIMEOUT) as client:
         for activo in ActivoRepository(db).list_por_ticker():
+            # Cierres diarios: data912; si no tiene ese activo (algunos no figuran), Yahoo Finanzas
             try:
                 filas = _cierres_data912(client, activo, desde)
+            except Exception:
+                filas = []
+            try:
+                if not filas:
+                    filas = _cierres_yahoo(client, activo, desde)
                 res["cierres"] += guardar_cierres(db, activo, filas)
                 db.flush()
             except Exception as exc:

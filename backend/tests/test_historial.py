@@ -181,3 +181,32 @@ def test_historial_rango_por_defecto_tres_meses(client, reloj):
     assert r["variacion_pct"] == 25
     assert len(client.get(f"/activos/{a['id']}/historial?dias=365").json()["cierres"]) == 3
     assert client.get(f"/activos/{a['id']}/historial?dias=0").status_code == 422
+
+
+def test_si_data912_no_tiene_cierres_se_usan_los_de_yahoo(client, monkeypatch):
+    from datetime import datetime, timezone
+
+    import httpx
+
+    from src.app import app
+    from src.db.connection import get_db
+    from src.services import historial_service as hs
+
+    nuevo_activo(client, "ORCL", tipo="cedear", precio=60000)
+    t = int(datetime(2026, 11, 12, 20, 0, tzinfo=timezone.utc).timestamp())
+    yahoo = {"chart": {"result": [{"timestamp": [t], "indicators": {"quote": [
+        {"open": [61000.0], "high": [62000.0], "low": [60500.0], "close": [61500.0], "volume": [2500]}]}}]}}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "data912.com":
+            return httpx.Response(404, json={"detail": "Not Found"})
+        if request.url.params.get("interval") == "1d":
+            return httpx.Response(200, json=yahoo)
+        return httpx.Response(200, json={"chart": {"result": []}})
+
+    real = httpx.Client
+    monkeypatch.setattr(hs.httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    db = next(app.dependency_overrides[get_db]())
+    res = hs.cargar_historial(db, datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc))
+    db.close()
+    assert res["errores"] == [] and res["cierres"] == 1
