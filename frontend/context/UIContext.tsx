@@ -22,8 +22,6 @@ interface UIValue {
   confirm: (opts: ConfirmOpts) => void;
   theme: Theme;
   setTheme: (t: Theme) => void;
-  menuOpen: boolean;
-  toggleMenu: () => void;
   sheetOpen: boolean;
   setSheetOpen: (v: boolean) => void;
   puedeInstalar: boolean;
@@ -56,7 +54,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   const [modal, setModal] = useState<ConfirmOpts | null>(null);
   const okRef = useRef<HTMLButtonElement>(null);
   const [theme, setThemeState] = useState<Theme>("light");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [deferred, setDeferred] = useState<BeforeInstallPromptEvent | null>(null);
   const [env, setEnv] = useState({ esIOS: false, esStandalone: false });
@@ -65,7 +62,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     queueMicrotask(() => {
       setThemeState(leer("iolAula_tema") === "dark" ? "dark" : "light");
-      setMenuOpen(leer("iolAula_menu") === "abierto");
       setEnv({
         esIOS: /iphone|ipad|ipod/i.test(navigator.userAgent),
         esStandalone: window.matchMedia("(display-mode: standalone)").matches
@@ -78,10 +74,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     document.documentElement.setAttribute("data-theme", theme);
     document.querySelector('meta[name="theme-color"]')?.setAttribute("content", theme === "dark" ? "#0A111D" : "#F4F6F3");
   }, [theme]);
-
-  useEffect(() => {
-    document.body.classList.toggle("menu-open", menuOpen);
-  }, [menuOpen]);
 
   const toast = useCallback((msg: string, bad = false) => {
     setToastMsg({ msg, bad });
@@ -141,11 +133,6 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
       setThemeState(t);
       escribir("iolAula_tema", t);
     },
-    menuOpen,
-    toggleMenu: () => setMenuOpen((v) => {
-      escribir("iolAula_menu", v ? "cerrado" : "abierto");
-      return !v;
-    }),
     sheetOpen,
     setSheetOpen,
     puedeInstalar: !!deferred,
@@ -153,7 +140,7 @@ export function UIProvider({ children }: { children: React.ReactNode }) {
     esStandalone: env.esStandalone,
     instalar,
     vibrar,
-  }), [toast, theme, menuOpen, sheetOpen, deferred, env, instalar, vibrar]);
+  }), [toast, theme, sheetOpen, deferred, env, instalar, vibrar]);
 
   useEffect(() => {
     if (!modal) return;

@@ -9,7 +9,7 @@ import { useUI } from "@/context/UIContext";
 import { textoMercado } from "./ui";
 import {
   IcoAdmin, IcoAlerta, IcoCartera, IcoClave, IcoComprar, IcoIngresar, IcoInicio, IcoLuna, IcoMep, IcoMercado,
-  IcoOperaciones, IcoPerfil, IcoRetirar, IcoSalir, IcoToggle, IcoVender, TabCartera, TabInicio, TabMas, TabMercado,
+  IcoOperaciones, IcoPerfil, IcoRetirar, IcoSalir, IcoVender, TabCartera, TabInicio, TabMas, TabMercado,
 } from "./icons";
 
 // Movimientos se abre desde los botones de dinero del inicio (Ingresar, Retirar, Ver movimientos)
@@ -36,7 +36,7 @@ function seccion(path: string): string {
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const { estado, me, mercado, salir, reloadAll, avisos } = useSession();
-  const { theme, setTheme, toggleMenu, menuOpen, sheetOpen, setSheetOpen, vibrar } = useUI();
+  const { theme, setTheme, sheetOpen, setSheetOpen, vibrar } = useUI();
   const router = useRouter();
   const path = usePathname();
   const actual = seccion(path);
@@ -82,10 +82,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {/* Compu: riel de íconos que se abre con el botón de arriba. El perfil va abajo. */}
       <aside className="sidebar" aria-label="Menú">
-        <button type="button" className="side-toggle" onClick={toggleMenu} data-tip={menuOpen ? "Cerrar menú" : "Abrir menú"}
-          aria-label="Abrir o cerrar el menú" aria-expanded={menuOpen}>
-          <IcoToggle /><span className="lbl">Cerrar menú</span>
-        </button>
+        <Link href="/" className="side-logo" data-tip="Inicio" aria-label="Zeno Investments, ir al inicio">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/brand/zeno-mark.png" alt="" />
+        </Link>
         <nav className="nav">
           {NAV.map(({ href, label, Ico }) => (
             <Link key={href} href={href} className={`nav-item${actual === href ? " active" : ""}`} data-tip={label} aria-label={label}>

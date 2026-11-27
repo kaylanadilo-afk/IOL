@@ -7,10 +7,11 @@ export const IcoMercado = ({ w = 1.8 }: { w?: number }) => <svg {...P} strokeWid
 export const IcoCartera = () => <svg {...P}><path d="M12 3a9 9 0 1 0 9 9h-9z" /><path d="M15 2.6A9 9 0 0 1 21.4 9H15z" /></svg>;
 export const IcoOperaciones = () => <svg {...P}><path d="M8 6h12M8 12h12M8 18h12" /><circle cx="4" cy="6" r="1" /><circle cx="4" cy="12" r="1" /><circle cx="4" cy="18" r="1" /></svg>;
 export const IcoMovimientos = () => <svg {...P}><path d="M4 8h14l-3-3M20 16H6l3 3" /></svg>;
-export const IcoMep = () => <svg {...P}><path d="M12 3v18" /><path d="M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" /></svg>;
+// Signo $: una S de dos curvas iguales y la barra vertical, centrados en el cuadro
+export const IcoMep = () => <svg {...P}><path d="M12 2.5v19" /><path d="M16.5 6.5H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7" /></svg>;
+export const IcoBilletera = () => <svg {...P}><path d="M5 7.5V6.8A2.3 2.3 0 0 1 7.3 4.5H17v3" /><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M20.5 11.5h-3.5a2 2 0 0 0 0 4h3.5" /></svg>;
 export const IcoAlerta = () => <svg {...P}><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>;
 export const IcoAdmin = () => <svg {...P}><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>;
-export const IcoToggle = () => <svg {...P}><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16M13.5 10l2 2-2 2" /></svg>;
 
 // ---------- Acciones ----------
 export const IcoIngresar = () => <svg {...P}><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5" /><path d="M4 19h16" /></svg>;

@@ -10,13 +10,12 @@ import { useMe } from "@/context/SessionContext";
 import { PieChart } from "@/components/charts";
 import { distribucion, PortfolioChartCard } from "@/components/cards";
 import type { Cartera } from "@/lib/types";
+import { IcoBilletera, IcoMep } from "@/components/icons";
 import { ErrorCard, Head, Loading } from "@/components/ui";
 
 const ICO = { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 const IcoPatrimonio = () => <svg {...ICO}><path d="M3 10.5 12 4l9 6.5" /><path d="M5 10v9h14v-9" /><path d="M9.5 19v-5h5v5" /></svg>;
 const IcoPesos = () => <svg {...ICO}><path d="M3 17l5.5-5.5 4 4L21 7" /><path d="M15 7h6v6" /></svg>;
-const IcoDolares = () => <svg {...ICO}><path d="M12 3v18" /><path d="M16.5 7.5c0-1.7-2-3-4.5-3s-4.5 1.3-4.5 3 2 2.6 4.5 3 4.5 1.3 4.5 3-2 3-4.5 3-4.5-1.3-4.5-3" /></svg>;
-const IcoCaja = () => <svg {...ICO}><rect x="3" y="6" width="18" height="13" rx="2.5" /><path d="M3 10h18" /><path d="M16 14.5h2" /></svg>;
 
 export default function CarteraPage() {
   const { cuentaId, reloadKey, liveTick } = useMe();
@@ -36,12 +35,7 @@ export default function CarteraPage() {
     <>
       {head}
 
-      {/* Primero, cómo viene el valor de la cartera */}
-      <div className="home-grid">
-        <PortfolioChartCard title="Valor de la cartera" />
-        <DistribucionCartera cart={cart} />
-      </div>
-
+      {/* Primero, el resumen del patrimonio */}
       <div className="kpis">
         <div className="kpi2 feat">
           <span className="ico"><IcoPatrimonio /></span>
@@ -58,7 +52,7 @@ export default function CarteraPage() {
           </span>
         </div>
         <div className="kpi2">
-          <span className="ico usd"><IcoDolares /></span>
+          <span className="ico usd" aria-hidden="true"><IcoMep /></span>
           <small>Invertido en dólares</small>
           <strong>{money(cart.total_valorizado.USD, "USD")}</strong>
           <span className="foot">
@@ -66,11 +60,17 @@ export default function CarteraPage() {
           </span>
         </div>
         <div className="kpi2">
-          <span className="ico cash"><IcoCaja /></span>
+          <span className="ico efectivo" aria-hidden="true"><IcoBilletera /></span>
           <small>Disponible para operar</small>
           <strong>{money(cart.saldos_disponibles.ARS, "ARS")}</strong>
           <span className="foot">y {money(cart.saldos_disponibles.USD, "USD")}</span>
         </div>
+      </div>
+
+      {/* Después, cómo viene el valor de la cartera y su distribución */}
+      <div className="home-grid">
+        <PortfolioChartCard title="Valor de la cartera" />
+        <DistribucionCartera cart={cart} />
       </div>
 
       <div className="cart-sec">
