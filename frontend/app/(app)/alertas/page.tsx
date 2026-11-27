@@ -224,7 +224,7 @@ function AlertaForm({ activos, editando, inicialId, onListo, onCancelar }: {
     <form className="card alerta-form" onSubmit={guardar} noValidate>
       <div className="ctitle"><h2>{editando ? `Editar alerta de ${editando.ticker}` : "Nueva alerta"}</h2></div>
 
-      <div className={`field combo${errores.activo_id ? " invalid" : ""}`}>
+      <div className={`field combo f-activo${errores.activo_id ? " invalid" : ""}`}>
         <label htmlFor="alertaActivo">Activo</label>
         <div className="combo-in">
         <input id="alertaActivo" role="combobox" aria-expanded={abierta} aria-controls="alertaOpciones" autoComplete="off"
@@ -247,7 +247,7 @@ function AlertaForm({ activos, editando, inicialId, onListo, onCancelar }: {
         {activo && <p className="field-hint">Precio actual: <b>{money(activo.precio_actual, activo.moneda)}</b> · se toma como referencia</p>}
       </div>
 
-      <div className="field">
+      <div className="field f-tipo">
         <span className="field-label">Avisame cuando</span>
         <div className="opciones-tipo" role="radiogroup" aria-label="Condición">
           {TIPOS.map(([t, titulo, ayuda]) => (
@@ -259,7 +259,7 @@ function AlertaForm({ activos, editando, inicialId, onListo, onCancelar }: {
         </div>
       </div>
 
-      <div className={`field${errores.valor ? " invalid" : ""}`}>
+      <div className={`field f-valor${errores.valor ? " invalid" : ""}`}>
         <label htmlFor="alertaValor">{tipo === "precio" ? `Precio objetivo${activo ? ` (${activo.moneda})` : ""}` : "Porcentaje (%)"}</label>
         <input id="alertaValor" inputMode="decimal" placeholder={tipo === "precio" ? "50000" : "20"} value={valor}
           aria-invalid={!!errores.valor} aria-describedby={errores.valor ? "alertaValor-err" : undefined}
@@ -270,7 +270,7 @@ function AlertaForm({ activos, editando, inicialId, onListo, onCancelar }: {
         )}
       </div>
 
-      <div className={`field${errores.aviso ? " invalid" : ""}`}>
+      <div className={`field f-aviso${errores.aviso ? " invalid" : ""}`}>
         <span className="field-label">Cómo avisarte</span>
         <label className="check"><input type="checkbox" checked={email} onChange={(e) => setEmail(e.target.checked)} /> Por correo electrónico</label>
         <label className="check"><input type="checkbox" checked={app} onChange={(e) => setApp(e.target.checked)} /> En la app (campana de alertas)</label>
@@ -278,12 +278,12 @@ function AlertaForm({ activos, editando, inicialId, onListo, onCancelar }: {
         <FieldError id="alertaAviso" error={errores.aviso} />
       </div>
 
-      <div className="err" role="alert">{errores.general}</div>
-      <div className="form-actions">
+      <div className="err f-err" role="alert">{errores.general}</div>
+      <div className="form-actions f-acc">
         {editando && <button type="button" className="btn btn-ghost" onClick={onCancelar}>Cancelar</button>}
         <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Guardando…" : editando ? "Guardar cambios" : "Crear alerta"}</button>
       </div>
-      {editando && <p className="muted" style={{ fontSize: 12, margin: "8px 0 0" }}>Si cambiás la condición, el porcentaje se vuelve a medir desde el precio actual.</p>}
+      {editando && <p className="muted f-nota" style={{ fontSize: 12, margin: "8px 0 0" }}>Si cambiás la condición, el porcentaje se vuelve a medir desde el precio actual.</p>}
     </form>
   );
 }

@@ -210,3 +210,62 @@ def test_si_data912_no_tiene_cierres_se_usan_los_de_yahoo(client, monkeypatch):
     res = hs.cargar_historial(db, datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc))
     db.close()
     assert res["errores"] == [] and res["cierres"] == 1
+
+
+def test_serie_congelada_de_yahoo_no_se_guarda(client, monkeypatch, reloj):
+    """Yahoo repite siempre el mismo precio sin volumen para algunas acciones (p. ej. A3): se descarta,
+    se borra lo que hubiera de antes y la evolución usa el precio actual del activo."""
+    from tests.conftest import depositar, nuevo_inversor
+    from src.db.models.activo_model import CierreDiario
+    from sqlalchemy import select
+
+    a = nuevo_activo(client, "A3", precio=2600)
+    c = nuevo_inversor(client)["cuenta"]["id"]
+    depositar(client, c, 100000)
+    reloj.ahora = a_las(VIERNES, 12)
+    client.post(f"/cuentas/{c}/compras", json={"ticker": "A3", "cantidad": 2})
+    patch_precio(client, reloj, a["id"], 2610, a_las(VIERNES, 12))  # precio en vivo de la rueda
+    # Quedó guardado un cierre congelado de una carga anterior
+    db, _ = sesion()
+    db.add(CierreDiario(activo_id=a["id"], fecha=JUEVES, apertura=2215, maximo=2215, minimo=2215, cierre=2215, volumen=0))
+    db.commit()
+
+    dias = [datetime(2026, 10, 1, 20, tzinfo=timezone.utc) + timedelta(days=i) for i in range(20)]
+    yahoo = {"chart": {"result": [{"timestamp": [int(d.timestamp()) for d in dias], "indicators": {"quote": [
+        {"open": [2215.0] * 20, "high": [2215.0] * 20, "low": [2215.0] * 20, "close": [2215.0] * 20, "volume": [0] * 20}]}}]}}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "data912.com":
+            return httpx.Response(200, json={"Error": "no tengo ese ticker"})
+        if request.url.params.get("interval") == "1d":
+            return httpx.Response(200, json=yahoo)
+        return httpx.Response(200, json={"chart": {"result": []}})
+
+    real = httpx.Client
+    monkeypatch.setattr(historial.httpx, "Client", lambda **kw: real(transport=httpx.MockTransport(handler), **kw))
+    res = historial.cargar_historial(db, datetime(2026, 11, 13, 15, 0, tzinfo=timezone.utc))
+    assert res["descartados"] == ["A3"] and res["errores"] == []
+    assert [x.cierre for x in db.scalars(select(CierreDiario).where(CierreDiario.activo_id == a["id"]))] == [2610]
+    db.close()
+    # La evolución usa lo que hay (el cierre en vivo del viernes)
+    ev = client.get(f"/cuentas/{c}/evolucion?dias=30").json()
+    assert [p["valor_ars"] for p in ev["puntos"]] == [5220]
+
+
+def test_evolucion_con_un_activo_sin_historial_usa_su_precio_actual(client, reloj):
+    from tests.conftest import depositar, nuevo_inversor
+    c = nuevo_inversor(client)["cuenta"]["id"]
+    a = nuevo_activo(client, "GGAL", precio=100)
+    nuevo_activo(client, "A3", precio=2600)
+    depositar(client, c, 100000)
+    reloj.ahora = a_las(VIERNES, 12)
+    client.post(f"/cuentas/{c}/compras", json={"ticker": "GGAL", "cantidad": 10})
+    client.post(f"/cuentas/{c}/compras", json={"ticker": "A3", "cantidad": 1})
+    db, _ = sesion()
+    db.query(historial.CierreDiario).delete()
+    db.commit(); db.close()
+    for dia, p in ((JUEVES, 90), (VIERNES, 110)):
+        patch_precio(client, reloj, a["id"], p, a_las(dia, 16))
+    ev = client.get(f"/cuentas/{c}/evolucion?dias=30").json()
+    # A3 no tiene cierres: entra con su precio actual (2600) en los dos días
+    assert [p["valor_ars"] for p in ev["puntos"]] == [900 + 2600, 1100 + 2600]

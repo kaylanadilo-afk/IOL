@@ -571,7 +571,20 @@ button.back-link{border:0;background:transparent;font:inherit;font-size:13.5px;p
 .pie-ayuda{font-size:12.5px;margin:10px 0 0}
 
 /* ===================== Alertas de precios ===================== */
-.alertas-grid{display:grid;grid-template-columns:minmax(290px,340px) minmax(0,1fr);gap:12px;align-items:start}
+.alertas-grid{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+/* Nueva alerta a lo ancho: activo y condición arriba; valor, avisos y botón abajo */
+.alerta-form{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));column-gap:22px;align-items:start;
+  grid-template-areas:"titulo titulo titulo" "activo tipo tipo" "valor aviso acc" "err err err" "nota nota nota"}
+.alerta-form>.ctitle{grid-area:titulo}
+.alerta-form .f-activo{grid-area:activo}
+.alerta-form .f-tipo{grid-area:tipo}
+.alerta-form .f-valor{grid-area:valor}
+.alerta-form .f-aviso{grid-area:aviso}
+.alerta-form .f-acc{grid-area:acc;align-self:end;margin:12px 0}
+.alerta-form .f-err{grid-area:err}
+.alerta-form .f-err:empty{display:none}
+.alerta-form .f-nota{grid-area:nota}
+.alerta-form .opciones-tipo{grid-template-columns:repeat(3,minmax(0,1fr))}
 .alertas-table td{vertical-align:top}
 .alertas-grid>*{min-width:0}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
@@ -597,6 +610,11 @@ button.back-link{border:0;background:transparent;font:inherit;font-size:13.5px;p
 @media(max-width:1100px){
   .home-grid{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"chart chart" "favs patri"}
   .alertas-grid{grid-template-columns:minmax(0,1fr)}
+  .alerta-form{grid-template-columns:repeat(2,minmax(0,1fr));grid-template-areas:"titulo titulo" "activo activo" "tipo tipo" "valor aviso" "acc acc" "err err" "nota nota"}
+}
+@media(max-width:640px){
+  .alerta-form{grid-template-columns:minmax(0,1fr);grid-template-areas:"titulo" "activo" "tipo" "valor" "aviso" "acc" "err" "nota"}
+  .alerta-form .opciones-tipo{grid-template-columns:minmax(0,1fr)}
 }
 @media(max-width:800px){
   .home-grid{grid-template-columns:minmax(0,1fr);grid-template-areas:"chart" "patri" "favs"}

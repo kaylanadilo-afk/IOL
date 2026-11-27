@@ -111,6 +111,17 @@ def _cierres_data912(client: httpx.Client, activo: Activo, desde: date) -> list[
     return filas
 
 
+MIN_DIAS_CONGELADA = 10
+
+
+def serie_congelada(filas: list[dict]) -> bool:
+    """Una fuente que repite el mismo precio muchos días sin volumen no está siguiendo al activo
+    (le pasa a Yahoo con algunas acciones chicas, p. ej. A3): esos datos no sirven para graficar."""
+    if len(filas) < MIN_DIAS_CONGELADA:
+        return False
+    return len({f["cierre"] for f in filas}) == 1 and not any(f.get("volumen") for f in filas)
+
+
 def _cierres_yahoo(client: httpx.Client, activo: Activo, desde: date) -> list[dict]:
     """Cierres diarios de Yahoo Finanzas (TICKER.BA). Se usan cuando data912 no tiene el historial del activo."""
     r = client.get(YAHOO.format(simbolo=f"{activo.ticker}.BA"),
@@ -206,7 +217,7 @@ def cargar_historial(db: Session, ahora: datetime | None = None) -> dict:
     ahora = ahora or datetime.now(timezone.utc)
     hoy = fecha_ar(ahora)
     desde = hoy - timedelta(days=DIAS_HISTORIAL)
-    res = {"cierres": 0, "puntos_intradia": 0, "activos": 0, "errores": []}
+    res = {"cierres": 0, "puntos_intradia": 0, "activos": 0, "errores": [], "descartados": []}
     with httpx.Client(timeout=TIMEOUT) as client:
         for activo in ActivoRepository(db).list_por_ticker():
             # Cierres diarios: data912; si no tiene ese activo (algunos no figuran), Yahoo Finanzas
@@ -214,16 +225,25 @@ def cargar_historial(db: Session, ahora: datetime | None = None) -> dict:
                 filas = _cierres_data912(client, activo, desde)
             except Exception:
                 filas = []
+            congelada = False
             try:
                 if not filas:
                     filas = _cierres_yahoo(client, activo, desde)
+                if serie_congelada(filas):
+                    # Datos viejos repetidos: no se guardan y se borra lo que haya quedado de cargas anteriores.
+                    # El historial de ese activo se arma con los precios en vivo de cada rueda.
+                    congelada = True
+                    with db.begin_nested():
+                        HistorialRepository(db).borrar_congelados(activo.id, filas[0]["cierre"])
+                    res["descartados"].append(activo.ticker)
+                    filas = []
                 # Savepoint por activo: si la base rechaza algo de este activo, se deshace solo lo suyo
                 with db.begin_nested():
                     res["cierres"] += guardar_cierres(db, activo, filas)
             except Exception as exc:
                 res["errores"].append(f"{activo.ticker} (cierres): {type(exc).__name__}")
                 continue
-            if activo.tipo != "bono":
+            if activo.tipo != "bono" and not congelada:
                 try:
                     velas = _velas_yahoo(client, activo)
                     with db.begin_nested():
@@ -267,6 +287,8 @@ def evolucion_cartera(db: Session, cuenta_id: int, dias: int, hoy: date) -> dict
 
     Es una referencia de "cómo le fue a lo que tenés hoy": no reconstruye compras y ventas pasadas.
     Los activos en dólares se pasan a pesos con el MEP de ese día (cierre AL30 / cierre AL30D).
+    Un activo sin cierres guardados en el rango (ninguna fuente tiene su historial) se cuenta con su
+    precio actual, para que no desaparezca el gráfico entero por un solo activo.
     """
     cuenta = obtener_cuenta(db, cuenta_id)
     tenencias = [(t.activo, t.cantidad) for t in cuenta.tenencias]
@@ -277,7 +299,9 @@ def evolucion_cartera(db: Session, cuenta_id: int, dias: int, hoy: date) -> dict
     por_fecha: dict[date, dict[int, Decimal]] = {}
     for activo_id, f, c in filas:
         por_fecha.setdefault(f, {})[activo_id] = c
-    ultimo: dict[int, Decimal] = {}
+    con_cierres = {activo_id for activo_id, _, _ in filas}
+    ultimo: dict[int, Decimal] = {a.id: a.precio_actual for a, _ in tenencias
+                                  if a.id not in con_cierres and a.precio_actual}
     puntos = []
     for f in sorted(por_fecha):
         ultimo.update(por_fecha[f])  # si un activo no operó ese día, vale su último cierre

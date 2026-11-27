@@ -2,7 +2,7 @@
 (así las dos patas del MEP se guardan juntas o ninguna)."""
 from datetime import date, datetime
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from src.db.models.activo_model import Activo, CierreDiario, CotizacionIntradia, Dividendo
@@ -195,6 +195,14 @@ class HistorialRepository:
             select(CierreDiario.activo_id, CierreDiario.fecha, CierreDiario.cierre).where(
                 CierreDiario.activo_id.in_(ids), CierreDiario.fecha >= desde)
             .order_by(CierreDiario.fecha)).all()]
+
+    def borrar_congelados(self, activo_id: int, precio) -> None:
+        """Borra los cierres sin volumen y los puntos intradiarios que repiten un precio que la fuente dejó congelado."""
+        self.db.execute(delete(CierreDiario).where(
+            CierreDiario.activo_id == activo_id, CierreDiario.cierre == precio,
+            or_(CierreDiario.volumen.is_(None), CierreDiario.volumen == 0)))
+        self.db.execute(delete(CotizacionIntradia).where(
+            CotizacionIntradia.activo_id == activo_id, CotizacionIntradia.precio == precio))
 
     def borrar_intradia_anterior(self, limite: datetime) -> None:
         self.db.execute(delete(CotizacionIntradia).where(CotizacionIntradia.fecha_hora < limite))
