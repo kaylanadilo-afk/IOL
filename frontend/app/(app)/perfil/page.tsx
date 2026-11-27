@@ -6,7 +6,7 @@ import { compacto, iniciales } from "@/lib/format";
 import { useAsync } from "@/lib/useAsync";
 import { useMe } from "@/context/SessionContext";
 import { ErrorCard, Loading } from "@/components/ui";
-import { IcoAdmin, IcoAjustes, IcoAlerta, IcoChevron, IcoLista, IcoMep, IcoOperaciones } from "@/components/icons";
+import { IcoAdmin, IcoAgente, IcoAjustes, IcoAlerta, IcoChevron, IcoLista, IcoMep, IcoOperaciones } from "@/components/icons";
 
 export default function PerfilPage() {
   const { me, cuentaId, favs, reloadKey } = useMe();
@@ -23,7 +23,7 @@ export default function PerfilPage() {
   // Secciones que no están en el menú de abajo del celular, y la configuración
   // [ruta, ícono, texto, se ve en la compu] (en la compu el resto ya está en el menú lateral)
   const secciones: [string, () => React.JSX.Element, string, boolean][] = [
-    ["/movimientos", IcoLista, "Movimientos de la cuenta", true], ["/operaciones", IcoOperaciones, "Operaciones", false],
+    ["/agente", IcoAgente, "Zeno AI · tu analista", false], ["/movimientos", IcoLista, "Movimientos de la cuenta", true], ["/operaciones", IcoOperaciones, "Operaciones", false],
     ["/alertas", IcoAlerta, "Alertas de precios", false], ["/mep", IcoMep, "Dólar MEP", false],
   ];
   if (me.es_admin) secciones.push(["/admin", IcoAdmin, "Administración", false]);

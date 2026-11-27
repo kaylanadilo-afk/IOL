@@ -13,7 +13,7 @@ from src.config.env import settings
 from src.db import migraciones
 from src.db.connection import Base, engine
 from src.middlewares.error_middleware import app_error_handler, integrity_error_handler, validation_error_handler
-from src.routers import (activos_router, alertas_router, auth_router, conductores_router, cuentas_router, inversores_router,
+from src.routers import (activos_router, agente_router, alertas_router, auth_router, conductores_router, cuentas_router, inversores_router,
                          mercado_router, panel_router, pasajero_router, registros_router, user_router)
 from src.services import precios_service
 from src.utils.errors import AppError
@@ -48,6 +48,7 @@ app.add_exception_handler(AppError, app_error_handler)
 app.add_exception_handler(RequestValidationError, validation_error_handler)
 app.add_exception_handler(IntegrityError, integrity_error_handler)
 
+app.include_router(agente_router.router, prefix="/api")
 app.include_router(user_router.router, prefix="/api")
 app.include_router(auth_router.router, prefix="/api")
 app.include_router(pasajero_router.router, prefix="/api")

@@ -11,6 +11,7 @@ export const IcoMovimientos = () => <svg {...P}><path d="M4 8h14l-3-3M20 16H6l3 
 export const IcoMep = () => <svg {...P}><path d="M12 2.5v19" /><path d="M16.5 6.5H10a3 3 0 0 0 0 6h4a3 3 0 0 1 0 6H7" /></svg>;
 export const IcoBilletera = () => <svg {...P}><path d="M5 7.5V6.8A2.3 2.3 0 0 1 7.3 4.5H17v3" /><rect x="3.5" y="7.5" width="17" height="12" rx="2.5" /><path d="M20.5 11.5h-3.5a2 2 0 0 0 0 4h3.5" /></svg>;
 export const IcoAlerta = () => <svg {...P}><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z" /><path d="M10 20.5a2.2 2.2 0 0 0 4 0" /></svg>;
+export const IcoAgente = () => <svg {...P} strokeLinecap="round" strokeLinejoin="round"><path d="M3 19 9 12.5l4 3.5 7-9" /><path d="M15.5 7H20v4.5" /><path d="M5 4.5v3M3.5 6h3" /></svg>;
 export const IcoAdmin = () => <svg {...P}><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0" /><circle cx="16" cy="6" r="2" /><circle cx="10" cy="12" r="2" /><circle cx="18" cy="18" r="2" /></svg>;
 
 // ---------- Acciones ----------

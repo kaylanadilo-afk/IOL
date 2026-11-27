@@ -302,3 +302,44 @@ export interface Avisos {
   no_leidas: number;
   items: Notificacion[];
 }
+
+// ---------- Agente de inversiones (Zeno AI) ----------
+export type AccionAgente = "comprar" | "vender" | "mantener";
+
+export interface RecomendacionAgente {
+  accion: AccionAgente;
+  ticker: string;
+  monto: number;
+  /** Parte del saldo (o del primer depósito) para esta compra. */
+  porcentaje: number;
+  /** Compra sugerida sin saldo todavía: es una idea para el primer depósito. */
+  idea: boolean;
+  moneda: Moneda;
+  confianza: "alta" | "media" | "baja";
+  motivo: string;
+  cantidad_estimada: number;
+  activo: { id: number; nombre: string; tipo: TipoActivo; precio: number; riesgo: number; variacion_pct: number | null };
+}
+
+export interface InformeAgente {
+  titular: string;
+  resumen_mercado: string;
+  lectura_cartera: string;
+  postura: "defensiva" | "neutral" | "ofensiva";
+  puntaje_riesgo: number;
+  recomendaciones: RecomendacionAgente[];
+  riesgos: string[];
+  proximos_pasos: string[];
+  descartadas: string[];
+  situacion: "con_inversiones" | "sin_inversiones" | "cuenta_nueva_sin_saldo";
+  perfil: Perfil;
+  generado: string;
+  modelo: string;
+  /** De dónde salen los datos del análisis y de cuándo son */
+  fuentes?: string[];
+}
+
+export interface MensajeAgente {
+  role: "user" | "assistant";
+  content: string;
+}

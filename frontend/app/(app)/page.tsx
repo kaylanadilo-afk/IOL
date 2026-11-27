@@ -13,6 +13,7 @@ import {
 } from "@/components/cards";
 import { Badge } from "@/components/AppShell";
 import { IcoAlerta } from "@/components/icons";
+import { ZenoLinea } from "@/components/agente";
 import { ErrorCard, Loading, MercadoPill, MontoHero, RiskDots, StarButton, VarPill } from "@/components/ui";
 import type { Activo } from "@/lib/types";
 
@@ -90,6 +91,12 @@ export default function InicioPage() {
           <DineroBotones onAccion={setDinero} />
         </div>
       </section>
+
+      <Link href="/agente" className="ag-teaser">
+        <ZenoLinea size={38} />
+        <span><b>Zeno AI</b><small>Tu análisis del día según tu perfil {me.perfil_riesgo}</small></span>
+        <span className="ag-teaser-ir">Ver análisis</span>
+      </Link>
 
       <div className="home-grid">
         <div className="area-chart"><PortfolioChartCard title="Tu cartera" /></div>

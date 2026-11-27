@@ -8,13 +8,14 @@ import { useSession } from "@/context/SessionContext";
 import { useUI } from "@/context/UIContext";
 import { textoMercado } from "./ui";
 import {
-  IcoAdmin, IcoAlerta, IcoCartera, IcoClave, IcoComprar, IcoIngresar, IcoInicio, IcoLuna, IcoMep, IcoMercado,
+  IcoAdmin, IcoAgente, IcoAlerta, IcoCartera, IcoClave, IcoComprar, IcoIngresar, IcoInicio, IcoLuna, IcoMep, IcoMercado,
   IcoOperaciones, IcoPerfil, IcoRetirar, IcoSalir, IcoVender, TabCartera, TabInicio, TabMas, TabMercado,
 } from "./icons";
 
 // Movimientos se abre desde los botones de dinero del inicio (Ingresar, Retirar, Ver movimientos)
 const NAV = [
   { href: "/", label: "Inicio", Ico: IcoInicio },
+  { href: "/agente", label: "Zeno AI", Ico: IcoAgente },
   { href: "/mercado", label: "Mercado", Ico: IcoMercado },
   { href: "/cartera", label: "Mi cartera", Ico: IcoCartera },
   { href: "/alertas", label: "Alertas de precios", Ico: IcoAlerta },

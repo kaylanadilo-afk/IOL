@@ -2,7 +2,7 @@
 import type {
   Activo, ActivoCrear, Alerta, AlertaCrear, Avisos, Cartera, Cuenta, DividendoResultado, Dolares, EstadoHistorial, EstadoMercado,
   EstadoPrecios, Evolucion, FiltroOperaciones, Ganancias, HistorialDiario, HistorialOperaciones, Intradia,
-  Inversor, InversorCrear, MepResultado, Moneda, Movimiento, Operacion, Perfil, Sesion,
+  InformeAgente, Inversor, InversorCrear, MensajeAgente, MepResultado, Moneda, Movimiento, Operacion, Perfil, Sesion,
   Sparkline, TipoActivo,
 } from "./types";
 
@@ -129,4 +129,49 @@ export const api = {
   borrarAlerta: (id: number) => request<null>("DELETE", `/alertas/${id}`),
   avisos: () => request<Avisos>("GET", "/notificaciones"),
   leerAvisos: () => request<null>("POST", "/notificaciones/leidas"),
+
+  // Agente de inversiones (Zeno AI)
+  agenteEstado: () => request<{ configurado: boolean; modelo: string }>("GET", "/agente/estado"),
+  agenteInforme: (actualizar = false) => request<InformeAgente>("GET", `/agente/informe${actualizar ? "?actualizar=true" : ""}`),
 };
+
+/**
+ * Chat con el agente: la respuesta llega de a pedazos (Server-Sent Events) y se va pasando a `alTexto`.
+ * Devuelve el texto completo. Se puede cortar con `signal`.
+ */
+export async function chatAgente(mensajes: MensajeAgente[], alTexto: (parcial: string) => void, signal?: AbortSignal): Promise<string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers.Authorization = `Bearer ${token}`;
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}/agente/chat`, { method: "POST", headers, body: JSON.stringify({ mensajes }), signal });
+  } catch (e) {
+    if ((e as Error).name === "AbortError") throw e;
+    throw new ApiError("No se pudo conectar con la API. ¿Está corriendo el backend?", 0);
+  }
+  if (!res.ok || !res.body) {
+    const d = await res.json().catch(() => null) as { detail?: string; error?: string } | null;
+    throw new ApiError(d?.detail ?? `Error ${res.status}`, res.status, {}, d?.error ?? "");
+  }
+  const lector = res.body.getReader();
+  const deco = new TextDecoder();
+  let pendiente = "", texto = "";
+  for (;;) {
+    const { value, done } = await lector.read();
+    if (done) break;
+    pendiente += deco.decode(value, { stream: true });
+    const eventos = pendiente.split(/\r?\n\r?\n/);
+    pendiente = eventos.pop() ?? "";
+    for (const ev of eventos) {
+      const dato = ev.replace(/^data: /, "").trim();
+      if (!dato || dato === "[FIN]") continue;
+      const j = JSON.parse(dato) as { texto?: string; error?: string };
+      if (j.error) throw new ApiError(j.error, 502);
+      if (j.texto) {
+        texto += j.texto;
+        alTexto(texto);
+      }
+    }
+  }
+  return texto;
+}
