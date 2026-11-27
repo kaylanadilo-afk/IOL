@@ -4,7 +4,7 @@ from datetime import date
 from decimal import Decimal
 from typing import Literal
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.utils.validaciones import validar_cuit, validar_email, validar_nombre
 
@@ -80,7 +80,7 @@ class IngresarSchema(BaseModel):
 
 
 class CambiarPasswordSchema(BaseModel):
-    actual: str
+    permiso: str = Field(min_length=10, max_length=100)
     nueva: str
 
     @field_validator("nueva")

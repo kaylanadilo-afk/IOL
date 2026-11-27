@@ -81,11 +81,13 @@ export const api = {
   validarEmail: (email: string) => request<{ valido: boolean; email: string; mensaje: string | null }>("POST", "/inversores/validar-email", { email }),
   inversor: (id: number) => request<Inversor>("GET", `/inversores/${id}`),
   cambiarPerfil: (id: number, perfil_riesgo: Perfil) => request<Inversor>("PATCH", `/inversores/${id}/perfil`, { perfil_riesgo }),
-  // Cambio de contraseña en dos pasos: se pide (manda un código al correo) y se confirma con el código
-  pedirCambioPassword: (id: number, actual: string, nueva: string) =>
-    request<{ pendiente: boolean; email: string; minutos: number }>("POST", `/inversores/${id}/password`, { actual, nueva }),
-  confirmarCambioPassword: (id: number, codigo: string) =>
-    request<{ ok: boolean; token: string }>("POST", `/inversores/${id}/password/confirmar`, { codigo }),
+  // Cambio de contraseña: 1) llega un código al correo, 2) se confirma (da un permiso), 3) se elige la nueva
+  pedirCodigoPassword: (id: number) =>
+    request<{ enviado: boolean; email: string; minutos: number }>("POST", `/inversores/${id}/password/codigo`),
+  verificarCodigoPassword: (id: number, codigo: string) =>
+    request<{ permiso: string; minutos: number }>("POST", `/inversores/${id}/password/verificar`, { codigo }),
+  cambiarPassword: (id: number, permiso: string, nueva: string) =>
+    request<{ ok: boolean; token: string }>("POST", `/inversores/${id}/password`, { permiso, nueva }),
   favoritos: (id: number) => request<Activo[]>("GET", `/inversores/${id}/favoritos`),
   marcarFavorito: (id: number, activoId: number) => request<Activo[]>("POST", `/inversores/${id}/favoritos/${activoId}`),
   quitarFavorito: (id: number, activoId: number) => request<Activo[]>("DELETE", `/inversores/${id}/favoritos/${activoId}`),

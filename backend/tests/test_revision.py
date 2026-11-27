@@ -28,7 +28,8 @@ def dos(client):
     ("get", "/cuentas/{c}/movimientos", None),
     ("get", "/inversores/{i}", None),
     ("patch", "/inversores/{i}/perfil", {"perfil_riesgo": "conservador"}),
-    ("post", "/inversores/{i}/password", {"actual": PASSWORD, "nueva": "otra-clave-123"}),
+    ("post", "/inversores/{i}/password/codigo", None),
+    ("post", "/inversores/{i}/password", {"permiso": "x" * 20, "nueva": "otra-clave-123"}),
     ("get", "/panel/inversores/{i}", None),
     ("get", "/panel/cuentas/{c}/actividad", None),
     ("post", "/panel/cuentas/{c}/movimientos", {"tipo": "extraccion", "moneda": "ARS", "monto": 100}),
@@ -90,12 +91,21 @@ def test_login_se_frena_despues_de_5_errores(client):
     assert r.status_code == 429 and "minutos" in r.json()["detail"]
 
 
-def test_cambiar_password_tambien_se_frena(client):
+def test_cambiar_password_tambien_se_frena(client, monkeypatch):
+    from src.utils import correo
+    monkeypatch.setattr(correo, "despachar", lambda *a, **k: None)
     inv = nuevo_inversor(client)
+    url = f"/inversores/{inv['id']}/password"
+    # Después de 5 códigos equivocados hay que pedir uno nuevo
+    assert client.post(f"{url}/codigo").status_code == 200
     for _ in range(5):
-        client.post(f"/inversores/{inv['id']}/password", json={"actual": "mala-clave-1", "nueva": "otra-clave-123"})
-    r = client.post(f"/inversores/{inv['id']}/password", json={"actual": PASSWORD, "nueva": "otra-clave-123"})
-    assert r.status_code == 429
+        assert client.post(f"{url}/verificar", json={"codigo": "999999"}).status_code == 422
+    r = client.post(f"{url}/verificar", json={"codigo": "999999"})
+    assert r.status_code == 422 and "intentos" in r.json()["detail"]
+    # Y no se pueden pedir más de 5 códigos por hora
+    for _ in range(4):
+        client.post(f"{url}/codigo")
+    assert client.post(f"{url}/codigo").status_code == 429
 
 
 # ---------- B5 + B6: errores inesperados ----------

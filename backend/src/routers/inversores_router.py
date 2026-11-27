@@ -45,17 +45,24 @@ def actualizar_perfil(inversor_id: int, payload: UpdatePerfilSchema, db: Session
     return InversorService(db).actualizar_perfil(inversor_id, payload.perfil_riesgo)
 
 
-@router.post("/{inversor_id}/password", tags=["Sesión"],
-             summary="Paso 1: pedir el cambio de contraseña (pide la actual y manda un código al correo)")
-def cambiar_password(inversor_id: int, payload: CambiarPasswordSchema, db: Session = Depends(get_db), _yo=Depends(inversor_autorizado)):
-    return InversorService(db).solicitar_cambio_password(inversor_id, payload.actual, payload.nueva)
+@router.post("/{inversor_id}/password/codigo", tags=["Sesión"],
+             summary="Cambio de contraseña, paso 1: manda un código de 6 dígitos al correo")
+def pedir_codigo_password(inversor_id: int, db: Session = Depends(get_db), _yo=Depends(inversor_autorizado)):
+    return InversorService(db).pedir_codigo_password(inversor_id)
 
 
-@router.post("/{inversor_id}/password/confirmar", response_model=PasswordCambiadaDTO, tags=["Sesión"],
-             summary="Paso 2: confirmar el cambio de contraseña con el código del correo. Devuelve un token nuevo")
-def confirmar_password(inversor_id: int, payload: ConfirmarPasswordSchema, db: Session = Depends(get_db),
-                       _yo=Depends(inversor_autorizado)):
-    return InversorService(db).confirmar_cambio_password(inversor_id, payload.codigo)
+@router.post("/{inversor_id}/password/verificar", tags=["Sesión"],
+             summary="Cambio de contraseña, paso 2: confirma el código y devuelve un permiso para elegir la nueva")
+def verificar_codigo_password(inversor_id: int, payload: ConfirmarPasswordSchema, db: Session = Depends(get_db),
+                              _yo=Depends(inversor_autorizado)):
+    return InversorService(db).verificar_codigo_password(inversor_id, payload.codigo)
+
+
+@router.post("/{inversor_id}/password", response_model=PasswordCambiadaDTO, tags=["Sesión"],
+             summary="Cambio de contraseña, paso 3: guarda la nueva con el permiso del paso 2. Devuelve un token nuevo")
+def cambiar_password(inversor_id: int, payload: CambiarPasswordSchema, db: Session = Depends(get_db),
+                     _yo=Depends(inversor_autorizado)):
+    return InversorService(db).cambiar_password(inversor_id, payload.permiso, payload.nueva)
 
 
 @router.get("/{inversor_id}/favoritos", response_model=list[ActivoDTO], tags=["Favoritos"])

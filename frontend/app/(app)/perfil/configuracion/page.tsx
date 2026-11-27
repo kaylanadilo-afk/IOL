@@ -26,9 +26,9 @@ export default function ConfiguracionPage() {
   // "Cambiar contraseña" desde el submenú del perfil lleva a /perfil/configuracion#password
   useEffect(() => {
     if (window.location.hash === "#password") {
-      const p = document.getElementById("passActual");
+      const p = document.getElementById("password");
       p?.scrollIntoView({ behavior: "smooth", block: "center" });
-      p?.focus({ preventScroll: true });
+      p?.querySelector<HTMLElement>("button, input")?.focus({ preventScroll: true });
     }
   }, []);
 
@@ -114,70 +114,87 @@ export default function ConfiguracionPage() {
 
 function PasswordCard({ inversorId }: { inversorId: number }) {
   const { toast } = useUI();
-  const [actual, setActual] = useState("");
+  // Paso 1: pedir el código · Paso 2: escribir el código · Paso 3: elegir la contraseña nueva
+  const [enviado, setEnviado] = useState<{ email: string; minutos: number } | null>(null);
+  const [permiso, setPermiso] = useState("");
+  const [codigo, setCodigo] = useState("");
   const [nueva, setNueva] = useState("");
   const [rep, setRep] = useState("");
   const [errores, setErrores] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState("");
   const [busy, setBusy] = useState(false);
-  // Paso 2: a qué correo se mandó el código
-  const [enviado, setEnviado] = useState<{ email: string; minutos: number } | null>(null);
-  const [codigo, setCodigo] = useState("");
 
+  const reiniciar = () => {
+    setEnviado(null); setPermiso(""); setCodigo(""); setNueva(""); setRep(""); setErrores({}); setGeneral("");
+  };
   const fallo = (err: unknown) => {
     const campos = err instanceof ApiError ? err.campos : {};
+    // Si el permiso venció o no es válido hay que volver a pedir el código
+    if (permiso && campos.codigo) { reiniciar(); setGeneral(campos.codigo); return; }
     if (Object.keys(campos).length) setErrores(campos);
     else setGeneral((err as Error).message);
   };
+  const correr = async (fn: () => Promise<void>) => {
+    setGeneral(""); setBusy(true);
+    try { await fn(); } catch (err) { fallo(err); } finally { setBusy(false); }
+  };
 
-  // Paso 1: se revisa la contraseña actual y llega un código al correo (la contraseña todavía no cambia)
-  const pedir = async (e?: React.FormEvent) => {
-    e?.preventDefault();
-    setGeneral("");
+  const pedirCodigo = () => correr(async () => {
+    const r = await api.pedirCodigoPassword(inversorId);
+    setEnviado({ email: r.email, minutos: r.minutos }); setCodigo(""); setErrores({});
+    toast(`Te mandamos un código a ${r.email}.`);
+  });
+
+  const verificar = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!/^\d{6}$/.test(codigo)) return setErrores({ codigo: "Ingresá los 6 dígitos del código" });
+    correr(async () => {
+      const r = await api.verificarCodigoPassword(inversorId, codigo);
+      setPermiso(r.permiso); setErrores({});
+    });
+  };
+
+  const guardar = (e: React.FormEvent) => {
+    e.preventDefault();
     const errs: Record<string, string> = {};
-    if (!actual) errs.actual = "Ingresá tu contraseña actual";
     if (nueva.length < 8) errs.nueva = "La contraseña nueva tiene que tener al menos 8 caracteres";
-    else if (nueva !== rep) errs.rep = "Las contraseñas nuevas no coinciden";
+    else if (nueva !== rep) errs.rep = "Las contraseñas no coinciden";
     setErrores(errs);
     if (Object.keys(errs).length) return;
-    setBusy(true);
-    try {
-      const r = await api.pedirCambioPassword(inversorId, actual, nueva);
-      setEnviado({ email: r.email, minutos: r.minutos });
-      setCodigo("");
-      toast(`Te mandamos un código a ${r.email}.`);
-    } catch (err) {
-      fallo(err);
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  // Paso 2: con el código del correo se aplica el cambio
-  const confirmar = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setGeneral("");
-    if (!/^\d{6}$/.test(codigo)) return setErrores({ codigo: "Ingresá los 6 dígitos del código" });
-    setBusy(true);
-    try {
-      const r = await api.confirmarCambioPassword(inversorId, codigo);
+    correr(async () => {
+      const r = await api.cambiarPassword(inversorId, permiso, nueva);
       guardarToken(r.token); // las otras sesiones dejan de valer; esta sigue con un token nuevo
-      setActual(""); setNueva(""); setRep(""); setCodigo(""); setEnviado(null); setErrores({});
+      reiniciar();
       toast("Listo: tu contraseña cambió. Te avisamos por correo.");
-    } catch (err) {
-      fallo(err);
-    } finally {
-      setBusy(false);
-    }
+    });
   };
 
+  // Paso 3: el código ya se confirmó, ahora sí se elige la contraseña
+  if (permiso) {
+    return (
+      <form className="card" noValidate onSubmit={guardar} id="password">
+        <div className="ctitle"><h2>Elegí tu contraseña nueva</h2></div>
+        <p className="pf-sub">Código confirmado. Al guardarla se cierran las otras sesiones abiertas.</p>
+        <PasswordField id="passNueva" label="Nueva (mínimo 8)" autoComplete="new-password" value={nueva}
+          error={errores.nueva} onChange={(v) => { setNueva(v); setErrores((x) => ({ ...x, nueva: "" })); }} />
+        <PasswordField id="passRepetir" label="Repetir la nueva" autoComplete="new-password" value={rep}
+          error={errores.rep} onChange={(v) => { setRep(v); setErrores((x) => ({ ...x, rep: "" })); }} />
+        <div className="err" role="alert">{general}</div>
+        <div className="form-actions">
+          <button type="button" className="btn btn-ghost" onClick={reiniciar}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Guardando…" : "Cambiar contraseña"}</button>
+        </div>
+      </form>
+    );
+  }
+
+  // Paso 2: escribir el código que llegó al correo
   if (enviado) {
     return (
-      <form className="card" noValidate onSubmit={confirmar} id="password">
-        <div className="ctitle"><h2>Confirmá el cambio</h2></div>
+      <form className="card" noValidate onSubmit={verificar} id="password">
+        <div className="ctitle"><h2>Revisá tu correo</h2></div>
         <p className="pf-sub">
           Te mandamos un código de 6 dígitos a <b>{enviado.email}</b>. Vence en {enviado.minutos} minutos.
-          Tu contraseña no cambia hasta que lo ingreses.
         </p>
         <div className={`field${errores.codigo ? " invalid" : ""}`}>
           <label htmlFor="pwdCodigo">Código del correo</label>
@@ -189,28 +206,21 @@ function PasswordCard({ inversorId }: { inversorId: number }) {
         </div>
         <div className="err" role="alert">{general}</div>
         <div className="form-actions">
-          <button type="button" className="btn btn-ghost" onClick={() => { setEnviado(null); setErrores({}); setGeneral(""); }}>Cancelar</button>
-          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Confirmando…" : "Cambiar contraseña"}</button>
+          <button type="button" className="btn btn-ghost" onClick={reiniciar}>Cancelar</button>
+          <button type="submit" className="btn btn-primary" disabled={busy}>{busy ? "Revisando…" : "Continuar"}</button>
         </div>
-        <button type="button" className="link-btn" disabled={busy} onClick={() => pedir()}>¿No te llegó? Mandar otro código</button>
+        <button type="button" className="link-btn" disabled={busy} onClick={pedirCodigo}>¿No te llegó? Mandar otro código</button>
       </form>
     );
   }
 
+  // Paso 1: pedir el código
   return (
-    <form className="card" noValidate onSubmit={pedir} id="password">
+    <div className="card" id="password">
       <div className="ctitle"><h2>Contraseña</h2></div>
-      <p className="pf-sub">Para cambiarla te vamos a mandar un código a tu correo. Al confirmarlo se cierran las otras sesiones abiertas.</p>
-      <PasswordField id="passActual" label="Contraseña actual" autoComplete="current-password" value={actual}
-        error={errores.actual} onChange={(v) => { setActual(v); setErrores((x) => ({ ...x, actual: "" })); }} />
-      <div className="g2e grid" style={{ gap: 10 }}>
-        <PasswordField id="passNueva" label="Nueva (mínimo 8)" autoComplete="new-password" value={nueva}
-          error={errores.nueva} onChange={(v) => { setNueva(v); setErrores((x) => ({ ...x, nueva: "" })); }} />
-        <PasswordField id="passRepetir" label="Repetir la nueva" autoComplete="new-password" value={rep}
-          error={errores.rep} onChange={(v) => { setRep(v); setErrores((x) => ({ ...x, rep: "" })); }} />
-      </div>
+      <p className="pf-sub">Para cambiarla primero te mandamos un código a tu correo. Cuando lo confirmes vas a poder elegir la nueva.</p>
       <div className="err" role="alert">{general}</div>
-      <button className="btn btn-primary" type="submit" disabled={busy}>{busy ? "Enviando código…" : "Enviarme un código"}</button>
-    </form>
+      <button className="btn btn-primary" type="button" disabled={busy} onClick={pedirCodigo}>{busy ? "Enviando código…" : "Enviarme un código"}</button>
+    </div>
   );
 }

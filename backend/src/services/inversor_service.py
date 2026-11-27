@@ -163,34 +163,29 @@ class InversorService:
             raise UnauthorizedError("La sesión venció. Volvé a ingresar.")
         return to_inversor(inv)
 
-    def solicitar_cambio_password(self, inversor_id: int, actual: str, nueva: str) -> dict:
-        """Paso 1: revisa la contraseña actual y manda un código al correo. La contraseña todavía no cambia."""
+    # Cambio de contraseña en tres pasos: 1) se pide un código al correo, 2) se confirma el código
+    # (devuelve un permiso de un solo uso), 3) con ese permiso se elige la contraseña nueva.
+    def pedir_codigo_password(self, inversor_id: int) -> dict:
+        """Paso 1: manda un código al correo del inversor. Todavía no se pide ninguna contraseña."""
         inv = obtener_inversor(self.db, inversor_id)
-        clave = str(inversor_id)
-        limites.CAMBIO_PASSWORD.verificar(clave)
-        if not seguridad.verificar(actual, inv.password_hash):
-            limites.CAMBIO_PASSWORD.registrar(clave)
-            raise UnauthorizedError("La contraseña actual no es correcta.", campo="actual")
-        if actual == nueva:
-            raise BusinessError("La contraseña nueva tiene que ser distinta de la actual.", campo="nueva")
-        limites.REENVIO.consumir(f"pwd:{clave}")  # hasta 5 correos por hora
+        limites.REENVIO.consumir(f"pwd:{inversor_id}")  # hasta 5 correos por hora
         codigo = f"{secrets.randbelow(10**6):06d}"
-        inv.pwd_nueva_hash = seguridad.hashear(nueva)
+        inv.pwd_nueva_hash = None
         inv.pwd_codigo_hash = seguridad.hash_codigo(inv.id, "pwd:" + codigo)
         inv.pwd_codigo_expira = datetime.now(timezone.utc) + timedelta(minutes=MINUTOS_CODIGO)
         inv.pwd_intentos = 0
         self.db.commit()
         asunto, texto, html = correo.mail_cambio_password(inv.nombre.split(" ")[0], codigo, MINUTOS_CODIGO)
         correo.despachar(inv.email, asunto, texto, html)
-        return {"pendiente": True, "email": _ocultar_email(inv.email), "minutos": MINUTOS_CODIGO}
+        return {"enviado": True, "email": _ocultar_email(inv.email), "minutos": MINUTOS_CODIGO}
 
-    def confirmar_cambio_password(self, inversor_id: int, codigo: str) -> PasswordCambiadaDTO:
-        """Paso 2: con el código del correo se aplica la contraseña nueva y se cierran las otras sesiones."""
+    def verificar_codigo_password(self, inversor_id: int, codigo: str) -> dict:
+        """Paso 2: revisa el código. Si está bien devuelve un permiso de un solo uso para elegir la contraseña."""
         inv = obtener_inversor(self.db, inversor_id)
         clave = f"pwd:{inversor_id}"
         limites.CODIGO.verificar(clave)
-        if not inv.pwd_codigo_hash or not inv.pwd_nueva_hash:
-            raise BusinessError("No hay un cambio de contraseña pendiente. Empezá de nuevo.", campo="codigo")
+        if not inv.pwd_codigo_hash or inv.pwd_nueva_hash:
+            raise BusinessError("No hay un código pendiente. Pedí uno nuevo.", campo="codigo")
         if inv.pwd_intentos >= MAX_INTENTOS:
             raise BusinessError("Superaste los intentos. Pedí un código nuevo.", campo="codigo")
         if inv.pwd_codigo_expira and _utc(inv.pwd_codigo_expira) < datetime.now(timezone.utc):
@@ -202,7 +197,28 @@ class InversorService:
             quedan = MAX_INTENTOS - inv.pwd_intentos
             raise BusinessError("El código no es correcto." + (f" Te quedan {quedan} intentos." if quedan else " Pedí uno nuevo."),
                                 campo="codigo")
-        inv.password_hash = inv.pwd_nueva_hash
+        # El código ya no sirve más: se reemplaza por el permiso (pwd_nueva_hash marca que el código se confirmó)
+        permiso = secrets.token_urlsafe(24)
+        inv.pwd_codigo_hash = None
+        inv.pwd_nueva_hash = seguridad.hash_codigo(inv.id, "permiso:" + permiso)
+        inv.pwd_codigo_expira = datetime.now(timezone.utc) + timedelta(minutes=MINUTOS_CODIGO)
+        inv.pwd_intentos = 0
+        self.db.commit()
+        return {"permiso": permiso, "minutos": MINUTOS_CODIGO}
+
+    def cambiar_password(self, inversor_id: int, permiso: str, nueva: str) -> PasswordCambiadaDTO:
+        """Paso 3: con el permiso del paso 2 se guarda la contraseña nueva y se cierran las otras sesiones."""
+        inv = obtener_inversor(self.db, inversor_id)
+        if not inv.pwd_nueva_hash or not secrets.compare_digest(
+                inv.pwd_nueva_hash, seguridad.hash_codigo(inv.id, "permiso:" + permiso)):
+            raise BusinessError("Primero confirmá el código que te mandamos por correo.", campo="codigo")
+        if inv.pwd_codigo_expira and _utc(inv.pwd_codigo_expira) < datetime.now(timezone.utc):
+            inv.pwd_nueva_hash = inv.pwd_codigo_expira = None
+            self.db.commit()
+            raise BusinessError("Pasó demasiado tiempo. Pedí un código nuevo.", campo="codigo")
+        if seguridad.verificar(nueva, inv.password_hash):
+            raise BusinessError("La contraseña nueva tiene que ser distinta de la actual.", campo="nueva")
+        inv.password_hash = seguridad.hashear(nueva)
         inv.pwd_nueva_hash = inv.pwd_codigo_hash = inv.pwd_codigo_expira = None
         inv.pwd_intentos = 0
         self.db.commit()

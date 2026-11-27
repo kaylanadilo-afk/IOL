@@ -83,10 +83,6 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <>
       {/* Compu: riel de íconos que se abre con el botón de arriba. El perfil va abajo. */}
       <aside className="sidebar" aria-label="Menú">
-        <Link href="/" className="side-logo" data-tip="Inicio" aria-label="Zeno Investments, ir al inicio">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/brand/zeno-mark.png" alt="" />
-        </Link>
         <nav className="nav">
           {NAV.map(({ href, label, Ico }) => (
             <Link key={href} href={href} className={`nav-item${actual === href ? " active" : ""}`} data-tip={label} aria-label={label}>

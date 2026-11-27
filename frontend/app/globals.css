@@ -102,9 +102,6 @@ body:not(.is-admin) .admin-only{display:none!important}
    elección se recuerda. Sobre el perfil aparece un submenú con las opciones de la cuenta. */
 .sidebar{position:fixed;inset:0 auto 0 0;width:var(--rail);z-index:30;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:14px 14px;transition:width .2s cubic-bezier(.2,.8,.2,1)}
 .menu-open .sidebar{width:var(--rail-open)}
-.side-logo{position:relative;display:grid;place-items:center;height:48px;margin-bottom:12px;border-radius:12px}
-.side-logo img{height:30px;width:auto;display:block}
-.side-logo:hover{background:var(--card2)}
 .nav{display:grid;gap:2px}
 .nav-item{position:relative;display:flex;align-items:center;gap:14px;width:100%;border:0;background:transparent;color:var(--muted);padding:11px 13px;border-radius:12px;cursor:pointer;text-align:left;white-space:nowrap;font-weight:500;transition:background .15s,color .15s}
 .nav-item svg{width:22px;height:22px;flex:0 0 22px}
