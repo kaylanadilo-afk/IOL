@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Table
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Index, Integer, String, Table, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.connection import Base
@@ -22,6 +22,8 @@ favoritos = Table(
     Base.metadata,
     Column("inversor_id", ForeignKey("inversores.id", ondelete="CASCADE"), primary_key=True),
     Column("activo_id", ForeignKey("activos.id", ondelete="CASCADE"), primary_key=True),
+    Column("fecha_agregado", DateTime(timezone=True), nullable=False, server_default=func.now()),
+    Index("idx_favorito_activo", "activo_id"),
 )
 
 

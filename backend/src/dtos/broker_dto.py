@@ -102,3 +102,24 @@ class DividendoDTO(BaseModel):
     fecha_pago: date
     cuentas_acreditadas: int
     total_pagado: Dinero
+
+
+# ---------- Registros (alta, edición y baja de cada tabla) ----------
+class TenenciaDTO(OrmDTO):
+    cuenta_id: int
+    activo_id: int
+    cantidad: int
+    precio_promedio: Dinero
+
+
+class FavoritoDTO(BaseModel):
+    inversor_id: int
+    activo_id: int
+    fecha_agregado: Fecha | None = None
+
+
+class DividendoRegistroDTO(OrmDTO):
+    id: int
+    activo_id: int
+    monto_por_unidad: Dinero
+    fecha_pago: date

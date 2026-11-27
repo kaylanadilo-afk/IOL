@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from decimal import Decimal
 
-from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, ForeignKey, Index, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.connection import Base
@@ -18,6 +18,7 @@ class Activo(Base):
         CheckConstraint(f"moneda IN {en(MONEDAS)}", name="ck_activo_moneda"),
         CheckConstraint("precio_actual > 0", name="ck_activo_precio"),
         CheckConstraint("nivel_riesgo BETWEEN 1 AND 5", name="ck_activo_riesgo"),
+        Index("idx_activo_tipo_moneda", "tipo", "moneda"),  # HU2: filtro del catálogo
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -35,7 +36,10 @@ class Activo(Base):
 
 class Dividendo(Base):
     __tablename__ = "dividendos"
-    __table_args__ = (CheckConstraint("monto_por_unidad > 0", name="ck_dividendo_monto"),)
+    __table_args__ = (
+        CheckConstraint("monto_por_unidad > 0", name="ck_dividendo_monto"),
+        Index("idx_dividendo_activo_fecha", "activo_id", "fecha_pago"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     activo_id: Mapped[int] = mapped_column(ForeignKey("activos.id"), index=True)

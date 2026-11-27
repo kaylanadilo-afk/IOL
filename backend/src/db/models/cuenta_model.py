@@ -1,7 +1,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Integer, Numeric, String
+from sqlalchemy import CheckConstraint, Index, DateTime, ForeignKey, Integer, Numeric, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from src.db.connection import Base
@@ -43,7 +43,10 @@ class Tenencia(Base):
     """Relación N a M cuenta <-> activo, con cantidad y precio promedio."""
 
     __tablename__ = "tenencias"
-    __table_args__ = (CheckConstraint("cantidad > 0", name="ck_tenencia_cantidad"),)
+    __table_args__ = (
+        CheckConstraint("cantidad > 0", name="ck_tenencia_cantidad"),
+        CheckConstraint("precio_promedio >= 0", name="ck_tenencia_precio_promedio"),
+    )
 
     cuenta_id: Mapped[int] = mapped_column(ForeignKey("cuentas.id"), primary_key=True)
     activo_id: Mapped[int] = mapped_column(ForeignKey("activos.id"), primary_key=True)
@@ -60,6 +63,7 @@ class Movimiento(Base):
         CheckConstraint(f"tipo IN {en(TIPOS_MOVIMIENTO)}", name="ck_movimiento_tipo"),
         CheckConstraint(f"moneda IN {en(MONEDAS)}", name="ck_movimiento_moneda"),
         CheckConstraint("monto > 0", name="ck_movimiento_monto"),
+        Index("idx_movimiento_cuenta_fecha", "cuenta_id", "fecha"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
